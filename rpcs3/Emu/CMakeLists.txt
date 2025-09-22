@@ -567,12 +567,14 @@ if(NOT ANDROID)
         RSX/GL/GLVertexProgram.cpp
         RSX/GL/OpenGL.cpp
         RSX/GL/upscalers/fsr1/fsr_pass.cpp
+        RSX/GL/upscalers/fsr3/fsr_pass.cpp
     )
 endif()
 
 if(TARGET 3rdparty_vulkan)
     target_sources(rpcs3_emu PRIVATE
         RSX/VK/upscalers/fsr1/fsr_pass.cpp
+        RSX/VK/upscalers/fsr3/fsr_pass.cpp
         RSX/VK/vkutils/barriers.cpp
         RSX/VK/vkutils/buffer_object.cpp
         RSX/VK/vkutils/chip_class.cpp
