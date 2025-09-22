@@ -7,6 +7,7 @@
 
 #include "upscalers/bilinear_pass.hpp"
 #include "upscalers/fsr_pass.h"
+#include "upscalers/fsr3_pass.h"
 #include "upscalers/nearest_pass.hpp"
 #include "util/asm.hpp"
 #include "util/video_provider.h"
@@ -606,6 +607,10 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 		else if (m_output_scaling == output_scaling_mode::fsr)
 		{
 			m_upscaler = std::make_unique<vk::fsr_upscale_pass>();
+		}
+		else if (m_output_scaling == output_scaling_mode::fsr3)
+		{
+			m_upscaler = std::make_unique<vk::fsr3_upscale_pass>();
 		}
 		else
 		{

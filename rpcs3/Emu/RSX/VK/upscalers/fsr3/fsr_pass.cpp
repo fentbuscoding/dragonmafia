@@ -1,0 +1,292 @@
+#include "../../vkutils/barriers.h"
+#include "../../VKHelpers.h"
+#include "../../VKResourceManager.h"
+
+#include "../fsr3_pass.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#elif defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wignored-qualifiers"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
+
+#define A_CPU 1
+#include "3rdparty/GPUOpen/include/ffx_a.h"
+#include "3rdparty/GPUOpen/include/ffx_fsr3.h"
+#undef A_CPU
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+
+namespace vk
+{
+	namespace FidelityFX
+	{
+		fsr3_pass::fsr3_pass(const std::string& config_definitions, u32 push_constants_size_)
+		{
+			// Use AMD-provided source with FSR3 modifications
+			const char* shader_core =
+				#include "Emu/RSX/Program/Upscalers/FSR3/fsr_ubershader.glsl"
+			;
+
+			// Replacements
+			const char* ffx_a_contents =
+				#include "Emu/RSX/Program/Upscalers/FSR1/fsr_ffx_a_flattened.inc"
+			;
+
+			const char* ffx_fsr_contents =
+				#include "Emu/RSX/Program/Upscalers/FSR3/fsr_ffx_fsr3_flattened.inc"
+			;
+
+			const std::pair<std::string_view, std::string> replacement_table[] =
+			{
+				{ "%FFX_DEFINITIONS%", config_definitions },
+				{ "%FFX_A_IMPORT%", ffx_a_contents },
+				{ "%FFX_FSR_IMPORT%", ffx_fsr_contents },
+				{ "%push_block%", "push_constant" }
+			};
+
+			m_src = shader_core;
+			m_src = fmt::replace_all(m_src, replacement_table);
+
+			// Fill with 0 to avoid sending incomplete/unused variables to the GPU
+			memset(m_constants_buf, 0, sizeof(m_constants_buf));
+
+			// No ssbo usage
+			ssbo_count = 0;
+
+			// Enable push constants
+			use_push_constants = true;
+			push_constants_size = push_constants_size_;
+
+			create();
+		}
+
+		std::vector<glsl::program_input> fsr3_pass::get_inputs()
+		{
+			return
+			{
+				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_texture, {}, 0xFF, 0, "InputTexture" },
+				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_storage_image, {}, 0xFF, 1, "OutputTexture" }
+			};
+		}
+
+		void fsr3_pass::bind_resources(const vk::command_buffer& /*cmd*/)
+		{
+			m_program->bind_uniform(m_sampler->value, 0, m_descriptor_sets);
+			m_program->bind_uniform((*m_input_image), 0, m_descriptor_sets);
+			m_program->bind_uniform((*m_output_image), 1, m_descriptor_sets);
+		}
+
+		void fsr3_pass::run(const vk::command_buffer& cmd, vk::viewable_image* src, vk::viewable_image* dst, const size2u& input_size, const size2u& output_size)
+		{
+			m_input_image = src->get_view(0xAAE4, rsx::default_remap_vector);
+			m_output_image = dst->get_view(0xAAE4, rsx::default_remap_vector);
+			m_input_size = input_size;
+			m_output_size = output_size;
+
+			configure(cmd);
+
+			compute_task::run(cmd, (output_size.width + 7) / 8, (output_size.height + 7) / 8);
+		}
+
+		fsr3_upscale_pass::fsr3_upscale_pass()
+			: fsr3_pass(
+				"#define SAMPLE_FSR3_UPSCALE 1\n"
+				"#define SAMPLE_FSR3_TEMPORAL 0\n",
+				80 // 5*VEC4
+			)
+		{}
+
+		void fsr3_upscale_pass::configure(const vk::command_buffer& cmd)
+		{
+			auto src_image = m_input_image->image();
+
+			// Configuration vectors for FSR3
+			auto con0 = &m_constants_buf[0];
+			auto con1 = &m_constants_buf[4];
+			auto con2 = &m_constants_buf[8];
+			auto con3 = &m_constants_buf[12];
+			auto con4 = &m_constants_buf[16];
+
+			// Setup FSR3 constants (simplified for now)
+			con0[0] = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
+			con0[1] = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
+			con0[2] = 0.5f * con0[0] - 0.5f;
+			con0[3] = 0.5f * con0[1] - 0.5f;
+
+			con1[0] = 1.0f / static_cast<f32>(src_image->width());
+			con1[1] = 1.0f / static_cast<f32>(src_image->height());
+			con1[2] = 0.5f * con1[0];
+			con1[3] = 0.5f * con1[1];
+
+			// Additional configuration for temporal data
+			con2[0] = con2[1] = con2[2] = con2[3] = 0.0f;
+			con3[0] = con3[1] = con3[2] = con3[3] = 0.0f;
+			con4[0] = con4[1] = con4[2] = con4[3] = 0.0f;
+
+			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
+		}
+
+		fsr3_temporal_pass::fsr3_temporal_pass()
+			: fsr3_pass(
+				"#define SAMPLE_FSR3_UPSCALE 0\n"
+				"#define SAMPLE_FSR3_TEMPORAL 1\n",
+				80 // 5*VEC4
+			)
+		{}
+
+		void fsr3_temporal_pass::configure(const vk::command_buffer& cmd)
+		{
+			// Similar to upscale pass but with temporal configuration
+			auto src_image = m_input_image->image();
+
+			auto con0 = &m_constants_buf[0];
+			auto con1 = &m_constants_buf[4];
+			auto con2 = &m_constants_buf[8];
+			auto con3 = &m_constants_buf[12];
+			auto con4 = &m_constants_buf[16];
+
+			// Setup temporal FSR3 constants
+			con0[0] = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
+			con0[1] = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
+			con0[2] = 0.5f * con0[0] - 0.5f;
+			con0[3] = 0.5f * con0[1] - 0.5f;
+
+			con1[0] = 1.0f / static_cast<f32>(src_image->width());
+			con1[1] = 1.0f / static_cast<f32>(src_image->height());
+			con1[2] = 0.5f * con1[0];
+			con1[3] = 0.5f * con1[1];
+
+			// Temporal-specific configuration
+			con2[0] = con2[1] = con2[2] = con2[3] = 0.0f;
+			con3[0] = con3[1] = con3[2] = con3[3] = 0.0f;
+			con4[0] = con4[1] = con4[2] = con4[3] = 0.0f; // Motion vector parameters
+
+			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
+		}
+	}
+
+	// Main FSR3 upscale pass implementation
+	void fsr3_upscale_pass::dispose_images()
+	{
+		m_output_left.reset();
+		m_output_right.reset();
+		m_intermediate_data.reset();
+	}
+
+	void fsr3_upscale_pass::initialize_image(u32 output_w, u32 output_h, rsx::flags32_t mode)
+	{
+		dispose_images();
+
+		const VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+		const VkImageUsageFlags usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		try
+		{
+			if (mode & vk::UPSCALE_LEFT_VIEW)
+			{
+				m_output_left = std::make_unique<vk::viewable_image>(
+					*vk::get_current_renderer(), 
+					vk::get_current_renderer()->get_memory_mapping().device_local, 
+					format, 
+					VK_IMAGE_TILING_OPTIMAL, 
+					usage, 
+					output_w, 
+					output_h, 
+					1, 1, 1, 
+					VK_SAMPLE_COUNT_1_BIT, 
+					VK_IMAGE_LAYOUT_GENERAL
+				);
+			}
+
+			if (mode & vk::UPSCALE_RIGHT_VIEW)
+			{
+				m_output_right = std::make_unique<vk::viewable_image>(
+					*vk::get_current_renderer(), 
+					vk::get_current_renderer()->get_memory_mapping().device_local, 
+					format, 
+					VK_IMAGE_TILING_OPTIMAL, 
+					usage, 
+					output_w, 
+					output_h, 
+					1, 1, 1, 
+					VK_SAMPLE_COUNT_1_BIT, 
+					VK_IMAGE_LAYOUT_GENERAL
+				);
+			}
+		}
+		catch (const vk::exception& e)
+		{
+			ensure(!m_output_left && !m_output_right && !m_intermediate_data);
+			rsx_log.error("FSR3 is not supported by this driver and hardware combination.");
+		}
+	}
+
+	vk::viewable_image* fsr3_upscale_pass::scale_output(
+		const vk::command_buffer& cmd,
+		vk::viewable_image* src,
+		VkImage present_surface,
+		VkImageLayout present_surface_layout,
+		const VkImageBlit& request,
+		rsx::flags32_t mode)
+	{
+		const auto input_w = static_cast<u32>(request.srcOffsets[1].x - request.srcOffsets[0].x);
+		const auto input_h = static_cast<u32>(request.srcOffsets[1].y - request.srcOffsets[0].y);
+		const auto output_w = static_cast<u32>(request.dstOffsets[1].x - request.dstOffsets[0].x);
+		const auto output_h = static_cast<u32>(request.dstOffsets[1].y - request.dstOffsets[0].y);
+
+		// Initialize output image if needed
+		if (!m_output_left && !m_output_right)
+		{
+			initialize_image(output_w, output_h, mode);
+		}
+
+		vk::viewable_image* output_image = nullptr;
+		if (mode & vk::UPSCALE_LEFT_VIEW)
+		{
+			output_image = m_output_left.get();
+		}
+		else if (mode & vk::UPSCALE_RIGHT_VIEW)
+		{
+			output_image = m_output_right.get();
+		}
+
+		if (!output_image)
+		{
+			rsx_log.warning("FSR3 is enabled, but the system is out of memory. Will fall back to bilinear upscaling.");
+			return src;
+		}
+
+		// Run FSR3 upscaling pass
+		static FidelityFX::fsr3_upscale_pass upscale_pass;
+		upscale_pass.run(cmd, src, output_image, { input_w, input_h }, { output_w, output_h });
+
+		// Commit result if requested
+		if (mode & vk::UPSCALE_AND_COMMIT)
+		{
+			VkImageBlit blit_request = request;
+			blit_request.srcOffsets[0] = { 0, 0, 0 };
+			blit_request.srcOffsets[1] = { static_cast<s32>(output_w), static_cast<s32>(output_h), 1 };
+
+			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+			vk::change_image_layout(cmd, present_surface, present_surface_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+
+			vkCmdBlitImage(cmd, output_image->value, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, present_surface, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit_request, VK_FILTER_LINEAR);
+
+			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+			vk::change_image_layout(cmd, present_surface, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, present_surface_layout, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+		}
+
+		return output_image;
+	}
+}

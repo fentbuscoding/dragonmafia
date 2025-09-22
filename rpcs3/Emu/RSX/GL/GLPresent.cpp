@@ -3,6 +3,7 @@
 
 #include "upscalers/bilinear_pass.hpp"
 #include "upscalers/fsr_pass.h"
+#include "upscalers/fsr3_pass.h"
 #include "upscalers/nearest_pass.hpp"
 
 #include "Emu/Cell/Modules/cellVideoOut.h"
@@ -316,6 +317,9 @@ void GLGSRender::flip(const rsx::display_flip_info_t& info)
 			case output_scaling_mode::fsr:
 				m_upscaler = std::make_unique<gl::fsr_upscale_pass>();
 				break;
+			case output_scaling_mode::fsr3:
+				m_upscaler = std::make_unique<gl::fsr3_upscale_pass>();
+				break;
 			case output_scaling_mode::bilinear:
 			default:
 				m_upscaler = std::make_unique<gl::bilinear_upscale_pass>();
@@ -335,7 +339,7 @@ void GLGSRender::flip(const rsx::display_flip_info_t& info)
 			const auto filter = m_output_scaling == output_scaling_mode::nearest ? gl::filter::nearest : gl::filter::linear;
 			rsx::simple_array<gl::texture*> images{ image_to_flip, image_to_flip2 };
 
-			if (m_output_scaling == output_scaling_mode::fsr && !avconfig.stereo_enabled) // 3D will be implemented later
+			if ((m_output_scaling == output_scaling_mode::fsr || m_output_scaling == output_scaling_mode::fsr3) && !avconfig.stereo_enabled) // 3D will be implemented later
 			{
 				for (unsigned i = 0; i < 2 && images[i]; ++i)
 				{
