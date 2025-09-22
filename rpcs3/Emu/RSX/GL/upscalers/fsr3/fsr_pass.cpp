@@ -121,28 +121,19 @@ namespace gl
 		void fsr3_upscale_pass::configure()
 		{
 			// Configure FSR3 upscaling constants based on actual input/output sizes
-			const f32 scale_x = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
-			const f32 scale_y = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
+			u32 con0[4], con1[4], con2[4], con3[4], con4[4];
 			
-			// con0: scale factors
-			m_constants_buf[0] = std::bit_cast<u32>(scale_x);
-			m_constants_buf[1] = std::bit_cast<u32>(scale_y);
-			m_constants_buf[2] = std::bit_cast<u32>(0.5f * scale_x - 0.5f);
-			m_constants_buf[3] = std::bit_cast<u32>(0.5f * scale_y - 0.5f);
+			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height), // Assume input image size same as viewport
+				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));
 
-			// con1: reciprocal dimensions
-			const f32 rcpw = 1.0f / static_cast<f32>(m_input_size.width);
-			const f32 rcph = 1.0f / static_cast<f32>(m_input_size.height);
-			m_constants_buf[4] = std::bit_cast<u32>(rcpw);
-			m_constants_buf[5] = std::bit_cast<u32>(rcph);
-			m_constants_buf[6] = std::bit_cast<u32>(0.5f * rcpw);
-			m_constants_buf[7] = std::bit_cast<u32>(0.5f * rcph);
-
-			// con2-con4: additional configuration for temporal data
-			for (int i = 8; i < 20; ++i)
-			{
-				m_constants_buf[i] = 0;
-			}
+			// Copy to constants buffer
+			std::memcpy(&m_constants_buf[0], con0, sizeof(con0));
+			std::memcpy(&m_constants_buf[4], con1, sizeof(con1));
+			std::memcpy(&m_constants_buf[8], con2, sizeof(con2));
+			std::memcpy(&m_constants_buf[12], con3, sizeof(con3));
+			std::memcpy(&m_constants_buf[16], con4, sizeof(con4));
 		}
 
 		fsr3_temporal_pass::fsr3_temporal_pass()
@@ -156,28 +147,19 @@ namespace gl
 		void fsr3_temporal_pass::configure()
 		{
 			// Configure FSR3 temporal constants
-			const f32 scale_x = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
-			const f32 scale_y = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
+			u32 con0[4], con1[4], con2[4], con3[4], con4[4];
 			
-			// con0: scale factors  
-			m_constants_buf[0] = std::bit_cast<u32>(scale_x);
-			m_constants_buf[1] = std::bit_cast<u32>(scale_y);
-			m_constants_buf[2] = std::bit_cast<u32>(0.5f * scale_x - 0.5f);
-			m_constants_buf[3] = std::bit_cast<u32>(0.5f * scale_y - 0.5f);
+			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height), // Assume input image size same as viewport
+				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));
 
-			// con1: reciprocal dimensions
-			const f32 rcpw = 1.0f / static_cast<f32>(m_input_size.width);
-			const f32 rcph = 1.0f / static_cast<f32>(m_input_size.height);
-			m_constants_buf[4] = std::bit_cast<u32>(rcpw);
-			m_constants_buf[5] = std::bit_cast<u32>(rcph);
-			m_constants_buf[6] = std::bit_cast<u32>(0.5f * rcpw);
-			m_constants_buf[7] = std::bit_cast<u32>(0.5f * rcph);
-
-			// con2-con4: temporal-specific configuration
-			for (int i = 8; i < 20; ++i)
-			{
-				m_constants_buf[i] = 0;
-			}
+			// Copy to constants buffer
+			std::memcpy(&m_constants_buf[0], con0, sizeof(con0));
+			std::memcpy(&m_constants_buf[4], con1, sizeof(con1));
+			std::memcpy(&m_constants_buf[8], con2, sizeof(con2));
+			std::memcpy(&m_constants_buf[12], con3, sizeof(con3));
+			std::memcpy(&m_constants_buf[16], con4, sizeof(con4));
 		}
 	}
 

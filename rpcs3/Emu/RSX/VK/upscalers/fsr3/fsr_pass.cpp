@@ -118,21 +118,10 @@ namespace vk
 			auto con3 = &m_constants_buf[12];
 			auto con4 = &m_constants_buf[16];
 
-			// Setup FSR3 constants (simplified for now)
-			con0[0] = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
-			con0[1] = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
-			con0[2] = 0.5f * con0[0] - 0.5f;
-			con0[3] = 0.5f * con0[1] - 0.5f;
-
-			con1[0] = 1.0f / static_cast<f32>(src_image->width());
-			con1[1] = 1.0f / static_cast<f32>(src_image->height());
-			con1[2] = 0.5f * con1[0];
-			con1[3] = 0.5f * con1[1];
-
-			// Additional configuration for temporal data
-			con2[0] = con2[1] = con2[2] = con2[3] = 0.0f;
-			con3[0] = con3[1] = con3[2] = con3[3] = 0.0f;
-			con4[0] = con4[1] = con4[2] = con4[3] = 0.0f;
+			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),     // Incoming viewport size to upscale (actual size)
+				static_cast<f32>(src_image->width()), static_cast<f32>(src_image->height()),     // Size of the raw image to upscale (in case viewport does not cover it all)
+				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));  // Size of output viewport (target size)
 
 			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
 		}
@@ -156,21 +145,10 @@ namespace vk
 			auto con3 = &m_constants_buf[12];
 			auto con4 = &m_constants_buf[16];
 
-			// Setup temporal FSR3 constants
-			con0[0] = static_cast<f32>(m_output_size.width) / static_cast<f32>(m_input_size.width);
-			con0[1] = static_cast<f32>(m_output_size.height) / static_cast<f32>(m_input_size.height);
-			con0[2] = 0.5f * con0[0] - 0.5f;
-			con0[3] = 0.5f * con0[1] - 0.5f;
-
-			con1[0] = 1.0f / static_cast<f32>(src_image->width());
-			con1[1] = 1.0f / static_cast<f32>(src_image->height());
-			con1[2] = 0.5f * con1[0];
-			con1[3] = 0.5f * con1[1];
-
-			// Temporal-specific configuration
-			con2[0] = con2[1] = con2[2] = con2[3] = 0.0f;
-			con3[0] = con3[1] = con3[2] = con3[3] = 0.0f;
-			con4[0] = con4[1] = con4[2] = con4[3] = 0.0f; // Motion vector parameters
+			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
+				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),     // Incoming viewport size to upscale (actual size)
+				static_cast<f32>(src_image->width()), static_cast<f32>(src_image->height()),     // Size of the raw image to upscale (in case viewport does not cover it all)
+				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));  // Size of output viewport (target size)
 
 			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
 		}

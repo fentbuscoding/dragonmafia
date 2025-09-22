@@ -67,87 +67,75 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //_____________________________________________________________/\_______________________________________________________________
 //==============================================================================================================================
-//                                                        FSR3 UPSCALE PASS
+//                                                        FSR3 CONSTANT SETUP
 //==============================================================================================================================
 
-// FSR3 Upscale configuration structure
-typedef struct Fsr3UpscaleConstants
-{
-    AF4 con0; // Configuration vector 0
-    AF4 con1; // Configuration vector 1  
-    AF4 con2; // Configuration vector 2
-    AF4 con3; // Configuration vector 3
-    AF4 con4; // Configuration vector 4 (motion vectors)
-} Fsr3UpscaleConstants;
-
-// Setup FSR3 upscale constants
-AF1 Fsr3UpscaleCon(
-    // Output configuration vectors
-    inout AF4 con0,
-    inout AF4 con1,
-    inout AF4 con2,
-    inout AF4 con3,
-    inout AF4 con4,
-    // Input parameters
-    AF1 inputSizeX,          // Input render resolution width
-    AF1 inputSizeY,          // Input render resolution height
-    AF1 inputImageSizeX,     // Input image width (may be larger than render size)
-    AF1 inputImageSizeY,     // Input image height
-    AF1 outputSizeX,         // Output resolution width
-    AF1 outputSizeY);        // Output resolution height
-
-// FSR3 temporal upscale function
-void Fsr3Upscale(
-    inout AF3 pix,           // Output pixel color
-    AU2 ip,                  // Integer pixel position
-    AF4 con0,                // Configuration vector 0
-    AF4 con1,                // Configuration vector 1
-    AF4 con2,                // Configuration vector 2
-    AF4 con3,                // Configuration vector 3
-    AF4 con4);               // Configuration vector 4 (motion vectors)
+// Call to setup required constant values (works on CPU or GPU).
+A_STATIC void Fsr3UpscaleCon(
+outAU4 con0,
+outAU4 con1,
+outAU4 con2,
+outAU4 con3,
+outAU4 con4,
+// This the rendered image resolution being upscaled
+AF1 inputViewportInPixelsX,
+AF1 inputViewportInPixelsY,
+// This is the resolution of the resource containing the input image (useful for dynamic resolution)
+AF1 inputSizeInPixelsX,
+AF1 inputSizeInPixelsY,
+// This is the display resolution which the input image gets upscaled to  
+AF1 outputSizeInPixelsX,
+AF1 outputSizeInPixelsY){
+ // Output integer position to a pixel position in viewport.
+ con0[0]=AU1_AF1(inputViewportInPixelsX*ARcpF1(outputSizeInPixelsX));
+ con0[1]=AU1_AF1(inputViewportInPixelsY*ARcpF1(outputSizeInPixelsY));
+ con0[2]=AU1_AF1(AF1_(0.5)*inputViewportInPixelsX*ARcpF1(outputSizeInPixelsX)-AF1_(0.5));
+ con0[3]=AU1_AF1(AF1_(0.5)*inputViewportInPixelsY*ARcpF1(outputSizeInPixelsY)-AF1_(0.5));
+ // Viewport pixel position to normalized image space.
+ con1[0]=AU1_AF1(ARcpF1(inputSizeInPixelsX));
+ con1[1]=AU1_AF1(ARcpF1(inputSizeInPixelsY));
+ con1[2]=AU1_AF1(AF1_(0.5)*ARcpF1(inputSizeInPixelsX));
+ con1[3]=AU1_AF1(AF1_(0.5)*ARcpF1(inputSizeInPixelsY));
+ // Additional configuration vectors for temporal data
+ con2[0]=AU1_AF1(AF1_(0.0));
+ con2[1]=AU1_AF1(AF1_(0.0));
+ con2[2]=AU1_AF1(AF1_(0.0));
+ con2[3]=AU1_AF1(AF1_(0.0));
+ con3[0]=AU1_AF1(AF1_(0.0));
+ con3[1]=AU1_AF1(AF1_(0.0));
+ con3[2]=AU1_AF1(AF1_(0.0));
+ con3[3]=AU1_AF1(AF1_(0.0));
+ con4[0]=AU1_AF1(AF1_(0.0)); // Motion vector configuration
+ con4[1]=AU1_AF1(AF1_(0.0));
+ con4[2]=AU1_AF1(AF1_(0.0));
+ con4[3]=AU1_AF1(AF1_(0.0));}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //_____________________________________________________________/\_______________________________________________________________
 //==============================================================================================================================
-//                                                        FSR3 FRAME GENERATION
-//==============================================================================================================================
-
-// FSR3 Frame Generation constants
-typedef struct Fsr3FrameGenConstants
-{
-    AF4 frameParams;         // Frame timing and interpolation parameters
-    AF4 motionParams;        // Motion vector parameters
-} Fsr3FrameGenConstants;
-
-// FSR3 frame generation function
-void Fsr3FrameGen(
-    inout AF3 pix,           // Output interpolated pixel
-    AU2 ip,                  // Integer pixel position
-    AF4 frameParams,         // Frame parameters
-    AF4 motionParams);       // Motion parameters
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//_____________________________________________________________/\_______________________________________________________________
-//==============================================================================================================================
-//                                                        FSR3 IMPLEMENTATION
+//                                                        FSR3 GPU IMPLEMENTATION
 //==============================================================================================================================
 
 #ifdef A_GPU
 
-// FSR3 Upscale implementation
-void Fsr3Upscale(inout AF3 pix, AU2 ip, AF4 con0, AF4 con1, AF4 con2, AF4 con3, AF4 con4)
+// FSR3 Upscaling function
+void Fsr3Upscale(
+inout AF3 pix,
+AU2 ip,
+AU4 con0,
+AU4 con1,
+AU4 con2,
+AU4 con3,
+AU4 con4)
 {
     // Convert to floating point position
-    AF2 pp = AF2(ip) * con0.xy + con0.zw;
+    AF2 pp = AF2(ip) * AF2_AU2(con0.xy) + AF2_AU2(con0.zw);
     AF2 fp = floor(pp);
     pp -= fp;
     
-    // Sample input texture with bilinear filtering as baseline
-    // In a full FSR3 implementation, this would include temporal accumulation
-    // and motion vector-based history sampling
-    AF2 p0 = fp * con1.xy + con1.zw;
+    // Calculate sample positions
+    AF2 p0 = fp * AF2_AU2(con1.xy) + AF2_AU2(con1.zw);
     
     // For now, implement as enhanced bilinear with basic temporal consideration
     // This is a simplified version - full FSR3 would require additional passes
@@ -158,45 +146,24 @@ void Fsr3Upscale(inout AF3 pix, AU2 ip, AF4 con0, AF4 con1, AF4 con2, AF4 con3, 
     pix = min(pix, AF3(1.0, 1.0, 1.0)); // Clamp to valid range
 }
 
-// FSR3 Frame Generation implementation (placeholder)
-void Fsr3FrameGen(inout AF3 pix, AU2 ip, AF4 frameParams, AF4 motionParams)
+// FSR3 Temporal upscaling with history
+void Fsr3TemporalUpscale(
+inout AF3 pix,
+AU2 ip,
+AU4 con0,
+AU4 con1,
+AU4 con2,
+AU4 con3,
+AU4 con4)
 {
-    // Frame generation would interpolate between current and previous frames
-    // This is a complex AI-based algorithm that requires specialized implementation
-    pix = AF3(1.0, 1.0, 1.0); // Placeholder
-}
-
-// Setup FSR3 constants
-AF1 Fsr3UpscaleCon(
-    inout AF4 con0,
-    inout AF4 con1, 
-    inout AF4 con2,
-    inout AF4 con3,
-    inout AF4 con4,
-    AF1 inputSizeX,
-    AF1 inputSizeY,
-    AF1 inputImageSizeX,
-    AF1 inputImageSizeY,
-    AF1 outputSizeX,
-    AF1 outputSizeY)
-{
-    // Calculate scaling factors
-    con0[0] = outputSizeX / inputSizeX;
-    con0[1] = outputSizeY / inputSizeY;
-    con0[2] = AF1(0.5) * con0[0] - AF1(0.5);
-    con0[3] = AF1(0.5) * con0[1] - AF1(0.5);
+    // Enhanced temporal upscaling with motion vectors
+    // This is a placeholder for the full temporal implementation
+    Fsr3Upscale(pix, ip, con0, con1, con2, con3, con4);
     
-    con1[0] = ARcpF1(inputImageSizeX);
-    con1[1] = ARcpF1(inputImageSizeY);
-    con1[2] = AF1(0.5) * con1[0];
-    con1[3] = AF1(0.5) * con1[1];
-    
-    // Additional configuration vectors for temporal data
-    con2 = AF4(0.0, 0.0, 0.0, 0.0);
-    con3 = AF4(0.0, 0.0, 0.0, 0.0);
-    con4 = AF4(0.0, 0.0, 0.0, 0.0); // Motion vector configuration
-    
-    return AF1(1.0);
+    // Additional temporal processing would go here
+    // - Motion vector sampling
+    // - History blending
+    // - Temporal stability
 }
 
 #endif // A_GPU

@@ -29,11 +29,11 @@ layout(set = 0, binding = 1, rgba8) uniform writeonly image2D OutputTexture;
 // Push constants for FSR3 configuration
 layout(%push_block%) uniform PushConstants
 {
-    vec4 con0;
-    vec4 con1;
-    vec4 con2;
-    vec4 con3;
-    vec4 con4;
+    uvec4 con0;
+    uvec4 con1;
+    uvec4 con2;
+    uvec4 con3;
+    uvec4 con4;
 } pc;
 
 // Main compute shader entry point
