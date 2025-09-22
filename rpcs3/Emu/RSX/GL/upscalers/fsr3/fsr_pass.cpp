@@ -75,7 +75,20 @@ namespace gl
 
 		void fsr3_pass::bind_resources()
 		{
-			m_sampler.bind(0);
+			const auto push_buffer_size = m_constants_buf.size() * sizeof(u32);
+
+			if (!m_ubo)
+			{
+				ensure(compiled);
+				m_ubo.create(gl::buffer::target::uniform, push_buffer_size, nullptr, gl::buffer::memory_type::local, gl::buffer::usage::dynamic_update);
+
+				// Statically bind the image sources
+				m_program.uniforms["InputTexture"] = GL_TEMP_IMAGE_SLOT(0);
+				m_program.uniforms["OutputTexture"] = GL_COMPUTE_IMAGE_SLOT(0);
+			}
+
+			m_ubo.sub_data(0, push_buffer_size, m_constants_buf.data());
+			m_ubo.bind_range(GL_COMPUTE_BUFFER_SLOT(0), 0, push_buffer_size);
 		}
 
 		void fsr3_pass::run(gl::command_context& cmd, gl::texture* src, gl::texture* dst, const size2u& input_size, const size2u& output_size)
@@ -87,23 +100,12 @@ namespace gl
 
 			configure();
 
-			// Bind input texture
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, src->id());
+			saved_sampler_state saved(GL_TEMP_IMAGE_SLOT(0), m_sampler);
+			cmd->bind_texture(GL_TEMP_IMAGE_SLOT(0), GL_TEXTURE_2D, src->id());
 
-			// Bind output image
-			glBindImageTexture(1, dst->id(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+			glBindImageTexture(GL_COMPUTE_IMAGE_SLOT(0), dst->id(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-			// Upload constants
-			m_ubo.reserve_storage_on_heap(m_constants_buf.size() * sizeof(u32));
-			auto mapped = m_ubo.map(gl::buffer::access::write);
-			std::memcpy(mapped, m_constants_buf.data(), m_constants_buf.size() * sizeof(u32));
-			m_ubo.unmap();
-
-			bind_resources();
-
-			// Dispatch compute shader
-			const auto wg_size = 8;
+			constexpr auto wg_size = 8;
 			const auto invocations_x = utils::aligned_div(output_size.width, wg_size);
 			const auto invocations_y = utils::aligned_div(output_size.height, wg_size);
 
