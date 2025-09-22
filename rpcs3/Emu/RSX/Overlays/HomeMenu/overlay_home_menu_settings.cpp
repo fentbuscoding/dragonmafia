@@ -42,7 +42,7 @@ namespace rsx
 			add_unsigned_slider(&g_cfg.video.anisotropic_level_override, localized_string_id::HOME_MENU_SETTINGS_VIDEO_ANISOTROPIC_OVERRIDE, "x", 2, {{0, "Auto"}}, {14});
 
 			add_dropdown(&g_cfg.video.output_scaling, localized_string_id::HOME_MENU_SETTINGS_VIDEO_OUTPUT_SCALING);
-			if (g_cfg.video.renderer == video_renderer::vulkan && g_cfg.video.output_scaling == output_scaling_mode::fsr)
+			if (g_cfg.video.renderer == video_renderer::vulkan && (g_cfg.video.output_scaling == output_scaling_mode::fsr || g_cfg.video.output_scaling == output_scaling_mode::fsr3))
 			{
 				add_unsigned_slider(&g_cfg.video.vk.rcas_sharpening_intensity, localized_string_id::HOME_MENU_SETTINGS_VIDEO_RCAS_SHARPENING, " %", 1);
 			}
