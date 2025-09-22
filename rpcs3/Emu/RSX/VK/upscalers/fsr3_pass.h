@@ -56,6 +56,9 @@ namespace vk
 		void initialize_image(u32 output_w, u32 output_h, rsx::flags32_t mode);
 
 	public:
+		fsr3_upscale_pass() = default;
+		~fsr3_upscale_pass();
+
 		vk::viewable_image* scale_output(
 			const vk::command_buffer& cmd,          // CB
 			vk::viewable_image* src,                // Source input

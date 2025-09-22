@@ -155,6 +155,11 @@ namespace vk
 	}
 
 	// Main FSR3 upscale pass implementation
+	fsr3_upscale_pass::~fsr3_upscale_pass()
+	{
+		dispose_images();
+	}
+
 	void fsr3_upscale_pass::dispose_images()
 	{
 		m_output_left.reset();
