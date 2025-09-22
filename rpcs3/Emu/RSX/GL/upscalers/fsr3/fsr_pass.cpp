@@ -1,5 +1,7 @@
+#include "stdafx.h"
+
+#include "../../glutils/fbo.h"
 #include "../fsr3_pass.h"
-#include "util/logs.hpp"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
