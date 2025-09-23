@@ -1920,25 +1920,25 @@ auto gen_ghc_cpp_trampoline(ppu_intrp_func_t fn_target)
 		c.mov(args[0], a64::x20);
 
 		Label cia_offset = c.new_label();
-		c.ldr(a64::x11, arm::Mem(cia_offset));
-		c.ldr(a64::x26, arm::Mem(args[0], a64::x11));
+		c.ldr(a64::x11, a64::Mem(cia_offset));
+		c.ldr(a64::x26, a64::Mem(args[0], a64::x11));
 
 		Label base_addr = c.new_label();
-		c.ldr(a64::x22, arm::Mem(base_addr));
-		c.ldr(a64::x22, arm::Mem(a64::x22));
+		c.ldr(a64::x22, a64::Mem(base_addr));
+		c.ldr(a64::x22, a64::Mem(a64::x22));
 
 		c.add(args[2], a64::x22, a64::x26);
 
 		Label jmp_target = c.new_label();
-		c.ldr(a64::x22, arm::Mem(jmp_target));
+		c.ldr(a64::x22, a64::Mem(jmp_target));
 		c.br(a64::x22);
 
 		c.bind(base_addr);
-		c.embedUInt64(reinterpret_cast<u64>(&vm::g_base_addr));
+		c.embed_uint64(reinterpret_cast<u64>(&vm::g_base_addr));
 		c.bind(cia_offset);
-		c.embedUInt64(static_cast<u64>(::offset32(&ppu_thread::cia)));
+		c.embed_uint64(static_cast<u64>(::offset32(&ppu_thread::cia)));
 		c.bind(jmp_target);
-		c.embedUInt64(reinterpret_cast<u64>(fn_target));
+		c.embed_uint64(reinterpret_cast<u64>(fn_target));
 	};
 }
 

@@ -116,19 +116,19 @@ static u64 make_null_function(const std::string& name)
 			// AArch64 implementation
 			Label data = c.new_label();
 			Label jump_address = c.new_label();
-			c.ldr(args[0], arm::ptr(data, 0));
-			c.ldr(a64::x14, arm::ptr(jump_address, 0));
+			c.ldr(args[0], a64::ptr(data, 0));
+			c.ldr(a64::x14, a64::ptr(jump_address, 0));
 			c.br(a64::x14);
 
 			// Data frame
 			c.align(AlignMode::kCode, 16);
 			c.bind(jump_address);
-			c.embedUInt64(reinterpret_cast<u64>(&null));
+			c.embed_uint64(reinterpret_cast<u64>(&null));
 
 			c.align(AlignMode::kData, 16);
 			c.bind(data);
 			c.embed(name.c_str(), name.size());
-			c.embedUInt8(0U);
+			c.db(0U);
 			c.align(AlignMode::kData, 16);
 #endif
 		});

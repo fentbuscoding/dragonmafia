@@ -263,23 +263,23 @@ DECLARE(spu_runtime::tr_all) = []
 			//ensure(::offset32(&spu_thread::block_hash) <= 32760);
 
 			// Load PC
-			c.ldr(a64::w1, arm::Mem(a64::x19, ::offset32(&spu_thread::pc))); // REG_Base + offset(spu_thread::pc)
+			c.ldr(a64::w1, a64::Mem(a64::x19, ::offset32(&spu_thread::pc))); // REG_Base + offset(spu_thread::pc)
 			// Compute LS address = REG_Sp + PC, store into x7 (use later)
 			c.add(a64::x7, a64::x20, a64::x1);
 			// Load 32b from LS address
-			c.ldr(a64::w3, arm::Mem(a64::x7));
+			c.ldr(a64::w3, a64::Mem(a64::x7));
 			// shr (32 - 20)
 			c.lsr(a64::w3, a64::w3, Imm(32 - 20));
 			// Load g_dispatcher
 			c.mov(a64::x4, Imm(reinterpret_cast<u64>(g_dispatcher)));
 			// Update block hash
 			c.mov(a64::x5, Imm(0));
-			c.str(a64::x5, arm::Mem(a64::x19, ::offset32(&spu_thread::block_hash))); // REG_Base + offset(spu_thread::block_hash)
+			c.str(a64::x5, a64::Mem(a64::x19, ::offset32(&spu_thread::block_hash))); // REG_Base + offset(spu_thread::block_hash)
 			// Jump to [g_dispatcher + idx * 8]
 			c.mov(a64::x6, Imm(8));
 			c.mul(a64::x6, a64::x3, a64::x6);
 			c.add(a64::x4, a64::x4, a64::x6);
-			c.ldr(a64::x4, arm::Mem(a64::x4));
+			c.ldr(a64::x4, a64::Mem(a64::x4));
 			c.br(a64::x4);
 			// Unreachable guard
 			c.brk(0x42);
@@ -393,14 +393,14 @@ DECLARE(spu_runtime::g_gateway) = build_function_asm<spu_function_t>("spu_gatewa
 	c.adr(a64::x15, epilogue_addr);
 	c.mov(a64::x16, a64::sp);
 
-	c.stp(a64::x15, a64::x16, arm::Mem(a64::x14));
-	c.stp(a64::x18, a64::x19, arm::Mem(a64::x14, 16));
-	c.stp(a64::x20, a64::x21, arm::Mem(a64::x14, 32));
-	c.stp(a64::x22, a64::x23, arm::Mem(a64::x14, 48));
-	c.stp(a64::x24, a64::x25, arm::Mem(a64::x14, 64));
-	c.stp(a64::x26, a64::x27, arm::Mem(a64::x14, 80));
-	c.stp(a64::x28, a64::x29, arm::Mem(a64::x14, 96));
-	c.str(a64::x30, arm::Mem(a64::x14, 112));
+	c.stp(a64::x15, a64::x16, a64::Mem(a64::x14));
+	c.stp(a64::x18, a64::x19, a64::Mem(a64::x14, 16));
+	c.stp(a64::x20, a64::x21, a64::Mem(a64::x14, 32));
+	c.stp(a64::x22, a64::x23, a64::Mem(a64::x14, 48));
+	c.stp(a64::x24, a64::x25, a64::Mem(a64::x14, 64));
+	c.stp(a64::x26, a64::x27, a64::Mem(a64::x14, 80));
+	c.stp(a64::x28, a64::x29, a64::Mem(a64::x14, 96));
+	c.str(a64::x30, a64::Mem(a64::x14, 112));
 
 	// Move 4 args (despite spu_function_t def)
 	c.mov(a64::x19, args[0]);
@@ -424,14 +424,14 @@ DECLARE(spu_runtime::g_gateway) = build_function_asm<spu_function_t>("spu_gatewa
 	c.mov(a64::x14, Imm(hv_regs_base));
 	c.add(a64::x14, a64::x14, a64::x19);
 
-	c.ldr(a64::x16, arm::Mem(a64::x14, 8));
-	c.ldp(a64::x18, a64::x19, arm::Mem(a64::x14, 16));
-	c.ldp(a64::x20, a64::x21, arm::Mem(a64::x14, 32));
-	c.ldp(a64::x22, a64::x23, arm::Mem(a64::x14, 48));
-	c.ldp(a64::x24, a64::x25, arm::Mem(a64::x14, 64));
-	c.ldp(a64::x26, a64::x27, arm::Mem(a64::x14, 80));
-	c.ldp(a64::x28, a64::x29, arm::Mem(a64::x14, 96));
-	c.ldr(a64::x30, arm::Mem(a64::x14, 112));
+	c.ldr(a64::x16, a64::Mem(a64::x14, 8));
+	c.ldp(a64::x18, a64::x19, a64::Mem(a64::x14, 16));
+	c.ldp(a64::x20, a64::x21, a64::Mem(a64::x14, 32));
+	c.ldp(a64::x22, a64::x23, a64::Mem(a64::x14, 48));
+	c.ldp(a64::x24, a64::x25, a64::Mem(a64::x14, 64));
+	c.ldp(a64::x26, a64::x27, a64::Mem(a64::x14, 80));
+	c.ldp(a64::x28, a64::x29, a64::Mem(a64::x14, 96));
+	c.ldr(a64::x30, a64::Mem(a64::x14, 112));
 
 	// Return
 	c.mov(a64::sp, a64::x16);
@@ -458,7 +458,7 @@ DECLARE(spu_runtime::g_escape) = build_function_asm<void(*)(spu_thread*)>("spu_e
 	c.mov(a64::x19, args[0]);
 	c.mov(a64::x15, Imm(reg_base));
 	c.add(a64::x15, a64::x15, args[0]);
-	c.ldr(a64::x30, arm::Mem(a64::x15));
+	c.ldr(a64::x30, a64::Mem(a64::x15));
 	c.ret(a64::x30);
 #else
 #error "Unimplemented"
@@ -490,19 +490,19 @@ DECLARE(spu_runtime::g_tail_escape) = build_function_asm<void(*)(spu_thread*, sp
 	// Tail call, GHC CC
 	c.mov(a64::x19, args[0]); // REG_Base
 	c.mov(a64::x15, Imm(::offset32(&spu_thread::ls))); // SPU::ls offset cannot be correctly encoded for ldr as it is too large
-	c.ldr(a64::x20, arm::Mem(a64::x19, a64::x15)); // REG_Sp
+	c.ldr(a64::x20, a64::Mem(a64::x19, a64::x15)); // REG_Sp
 	c.mov(a64::x21, args[2]);  // REG_Hp
 	c.mov(a64::x22, a64::xzr); // REG_R1
 
 	// Reset sp to patch leaks. Calls to tail escape may leave their stack "dirty" due to optimizations.
 	c.mov(a64::x14, Imm(reg_base + 8));
-	c.ldr(a64::x15, arm::Mem(a64::x19, a64::x14));
+	c.ldr(a64::x15, a64::Mem(a64::x19, a64::x14));
 	c.mov(a64::sp, a64::x15);
 
 	// Push context. This gateway can be returned to normally through a ret chain.
 	// FIXME: Push the current PC and "this" as part of the pseudo-frame and return here directly.
 	c.sub(a64::sp, a64::sp, Imm(16));
-	c.str(args[0], arm::Mem(a64::sp));
+	c.str(args[0], a64::Mem(a64::sp));
 
 	// Allocate scratchpad. Not needed if using per-function frames, or if we just don't care about returning to C++ (jump to gw exit instead)
 	c.sub(a64::sp, a64::sp, Imm(8192));
@@ -515,7 +515,7 @@ DECLARE(spu_runtime::g_tail_escape) = build_function_asm<void(*)(spu_thread*, sp
 	c.add(a64::sp, a64::sp, Imm(8192));
 
 	// Restore context. Escape point expects the current thread pointer at x19
-	c.ldr(a64::x19, arm::Mem(a64::sp));
+	c.ldr(a64::x19, a64::Mem(a64::sp));
 	c.add(a64::sp, a64::sp, Imm(16));
 
 	// <Optional> We could technically just emit a return here, but we may not want to for now until support is more mature.
@@ -523,7 +523,7 @@ DECLARE(spu_runtime::g_tail_escape) = build_function_asm<void(*)(spu_thread*, sp
 	// We can't guarantee stack sanity for the C++ code and it's cookies since we're basically treating stack as a scratch playground since we entered the main gateway.
 	// Instead, just fall back to hypervisor here. It also makes debugging easier.
 	c.mov(a64::x15, Imm(reg_base));
-	c.ldr(a64::x30, arm::Mem(a64::x19, a64::x15));
+	c.ldr(a64::x30, a64::Mem(a64::x19, a64::x15));
 	c.ret(a64::x30);
 #else
 #error "Unimplemented"
