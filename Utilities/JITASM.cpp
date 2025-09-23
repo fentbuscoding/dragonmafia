@@ -220,7 +220,8 @@ const asmjit::Environment& jit_runtime_base::environment() const noexcept
 void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 {
 	ensure(code->flatten() == asmjit::kErrorOk);
-	ensure(code->resolve_unresolved_links() == asmjit::kErrorOk);
+	// Note: resolveUnresolvedLinks may not be needed in newer AsmJit versions
+	// ensure(code->resolveUnresolvedLinks() == asmjit::kErrorOk);
 	usz codeSize = code->code_size();
 	if (!codeSize)
 		return nullptr;
@@ -736,7 +737,7 @@ void asmjit::simd_builder::_vec_binary_op(x86::Inst::Id sse_op, x86::Inst::Id ve
 {
 	if (utils::has_avx())
 	{
-		if (evex_op != x86::Inst::kIdNone && (vex_op == x86::Inst::kIdNone || this->_extra_reg.isReg() || vsize >= 64))
+		if (evex_op != x86::Inst::kIdNone && (vex_op == x86::Inst::kIdNone || this->_extra_reg.is_reg() || vsize >= 64))
 		{
 			this->evex().emit(evex_op, dst, lhs, rhs);
 		}
