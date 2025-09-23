@@ -377,18 +377,18 @@ namespace asmjit
 				if (op2 && utils::has_avx())
 				{
 					// Assume op2 is AVX (but could be PSHUFD as well for example)
-					ensure(!g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...));
+					ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 				}
 				else
 				{
 					// TODO
-					ensure(!g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16)));
+					ensure(g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16))) == asmjit::kErrorOk);
 					ensure(g_vc->emit(op, r, std::forward<Args>(args)...) == asmjit::kErrorOk);
 				}
 			}
 			else
 			{
-				ensure(!g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...));
+				ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 			}
 
 			return r;
@@ -401,18 +401,18 @@ namespace asmjit
 		static_assert(arg_classify<D> == arg_class::mem_lv);
 
 		mem_type dst;
-		dst.copyFrom(arg_eval(std::forward<D>(d), 16));
+		dst.copy_from(arg_eval(std::forward<D>(d), 16));
 
 		if (utils::has_avx512() && evex_op)
 		{
-			if (!dst.hasBaseLabel() && dst.hasOffset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
+			if (!dst.has_base_label() && dst.has_offset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
 			{
-				ensure(!g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)));
+				ensure(g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)) == asmjit::kErrorOk);
 				return;
 			}
 		}
 
-		ensure(!g_vc->emit(op, dst, arg_eval(std::forward<S>(s), 16)));
+		ensure(g_vc->emit(op, dst, arg_eval(std::forward<S>(s), 16)) == asmjit::kErrorOk);
 	}
 
 	template <typename A, typename B, typename... Args>
@@ -470,16 +470,16 @@ namespace asmjit
 				return vec_type{src1.id()};
 			}
 
-			ensure(!g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
+			ensure(g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 			return vec_type{src1.id()};
 		}
 		else do
 		{
 			if constexpr (arg_classify<A> == arg_class::mem_rv)
 			{
-				if (a.isReg())
+				if (a.is_reg())
 				{
-					src1 = vec_type(a.id());
+					src1 = vec_type::make_v128(a.id());
 
 					if constexpr (arg_classify<B> == arg_class::reg_rv)
 					{
@@ -528,7 +528,7 @@ namespace asmjit
 			}
 
 			// Fallback to arg copy
-			ensure(!g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16)));
+			ensure(g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16))) == asmjit::kErrorOk);
 		}
 		while (0);
 
@@ -538,11 +538,11 @@ namespace asmjit
 		}
 		else if (sse_op)
 		{
-			ensure(!g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
+			ensure(g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 		}
 		else
 		{
-			ensure(!g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
+			ensure(g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 		}
 
 		return vec_type{src1.id()};
@@ -2457,16 +2457,16 @@ inline asmjit::vec_type gv_signselect8(A&& bits, B&& _true, C&& _false)
 		Operand arg2 = arg_eval(std::forward<B>(_true), 16);
 		Operand arg3 = arg_eval(std::forward<C>(_false), 16);
 		if constexpr (!std::is_reference_v<A>)
-			arg0.isReg() ? arg_free(bits) : arg0.copyFrom(arg1);
+			arg0.is_reg() ? arg_free(bits) : arg0.copy_from(arg1);
 		if constexpr (!std::is_reference_v<B>)
-			arg0.isReg() ? arg_free(_true) : arg0.copyFrom(arg2);
+			arg0.is_reg() ? arg_free(_true) : arg0.copy_from(arg2);
 		if constexpr (!std::is_reference_v<C>)
-			arg0.isReg() ? arg_free(_false) : arg0.copyFrom(arg3);
-		if (arg0.isNone())
+			arg0.is_reg() ? arg_free(_false) : arg0.copy_from(arg3);
+		if (arg0.is_none())
 			arg0 = g_vc->vec_alloc();
 		g_vc->emit(x86::Inst::kIdVpblendvb, arg0, arg3, arg2, arg1);
 		vec_type r;
-		r.copyFrom(arg0);
+		r.copy_from(arg0);
 		return r;
 	}
 #endif
