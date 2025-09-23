@@ -133,7 +133,7 @@ namespace asmjit
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return vec_type(asmjit::x86::Vec::kIdXmm0 + idx);
+			return vec_type::make_v128(idx);
 		}
 
 		template <u32 Size>
@@ -323,7 +323,7 @@ namespace asmjit
 	{
 		if (op.is_reg())
 		{
-			g_vc->vec_dealloc(vec_type(asmjit::x86::Vec::kIdXmm0 + op.id()));
+			g_vc->vec_dealloc(vec_type::make_v128(op.id()));
 		}
 	}
 
