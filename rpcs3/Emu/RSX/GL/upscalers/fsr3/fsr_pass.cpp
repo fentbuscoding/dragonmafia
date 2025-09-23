@@ -114,40 +114,12 @@ namespace gl
 			ensure(invocations_y == (output_size.height + (wg_size - 1)) / wg_size);
 			compute_task::run(cmd, invocations_x, invocations_y);
 		}
+	}
 
-		fsr3_upscale_pass::fsr3_upscale_pass()
-			: fsr3_pass(
-				"#define SAMPLE_FSR3_UPSCALE 1\n"
-				"#define SAMPLE_FSR3_TEMPORAL 0\n",
-				80 // 5*VEC4
-			)
-		{}
+	}
 
-		void fsr3_upscale_pass::configure()
-		{
-			// Configure FSR3 upscaling constants based on actual input/output sizes
-			u32 con0[4], con1[4], con2[4], con3[4], con4[4];
-			
-			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
-				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),
-				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height), // Assume input image size same as viewport
-				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));
-
-			// Copy to constants buffer
-			std::memcpy(&m_constants_buf[0], con0, sizeof(con0));
-			std::memcpy(&m_constants_buf[4], con1, sizeof(con1));
-			std::memcpy(&m_constants_buf[8], con2, sizeof(con2));
-			std::memcpy(&m_constants_buf[12], con3, sizeof(con3));
-			std::memcpy(&m_constants_buf[16], con4, sizeof(con4));
-		}
-
-		fsr3_temporal_pass::fsr3_temporal_pass()
-			: fsr3_pass(
-				"#define SAMPLE_FSR3_UPSCALE 0\n"
-				"#define SAMPLE_FSR3_TEMPORAL 1\n",
-				80 // 5*VEC4
-			)
-		{}
+	// Main GL FSR3 upscaler implementation
+	fsr3_upscale_pass::fsr3_upscale_pass() = default;
 
 		void fsr3_temporal_pass::configure()
 		{

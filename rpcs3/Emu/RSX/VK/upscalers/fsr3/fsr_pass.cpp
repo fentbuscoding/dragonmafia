@@ -126,33 +126,6 @@ namespace vk
 			compute_task::run(cmd, (output_size.width + 7) / 8, (output_size.height + 7) / 8, 1);
 		}
 
-		fsr3_upscale_pass::fsr3_upscale_pass()
-			: fsr3_pass(
-				"#define SAMPLE_FSR3_UPSCALE 1\n"
-				"#define SAMPLE_FSR3_TEMPORAL 0\n",
-				80 // 5*VEC4
-			)
-		{}
-
-		void fsr3_upscale_pass::configure(const vk::command_buffer& cmd)
-		{
-			auto src_image = m_input_image->image();
-
-			// Configuration vectors for FSR3
-			auto con0 = &m_constants_buf[0];
-			auto con1 = &m_constants_buf[4];
-			auto con2 = &m_constants_buf[8];
-			auto con3 = &m_constants_buf[12];
-			auto con4 = &m_constants_buf[16];
-
-			Fsr3UpscaleCon(con0, con1, con2, con3, con4,
-				static_cast<f32>(m_input_size.width), static_cast<f32>(m_input_size.height),     // Incoming viewport size to upscale (actual size)
-				static_cast<f32>(src_image->width()), static_cast<f32>(src_image->height()),     // Size of the raw image to upscale (in case viewport does not cover it all)
-				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));  // Size of output viewport (target size)
-
-			load_program(cmd);
-		}
-
 		fsr3_temporal_pass::fsr3_temporal_pass()
 			: fsr3_pass(
 				"#define SAMPLE_FSR3_UPSCALE 0\n"
@@ -182,6 +155,8 @@ namespace vk
 	}
 
 	// Main FSR3 upscale pass implementation
+	fsr3_upscale_pass::fsr3_upscale_pass() = default;
+
 	fsr3_upscale_pass::~fsr3_upscale_pass()
 	{
 		dispose_images();
