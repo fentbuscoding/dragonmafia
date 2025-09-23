@@ -48,15 +48,34 @@ namespace vk
 
 	class fsr3_upscale_pass : public upscaler
 	{
+		// Output images
 		std::unique_ptr<vk::viewable_image> m_output_left;
 		std::unique_ptr<vk::viewable_image> m_output_right;
 		std::unique_ptr<vk::viewable_image> m_intermediate_data;
+		
+		// FSR3 temporal data
+		std::unique_ptr<vk::viewable_image> m_motion_vectors;
+		std::unique_ptr<vk::viewable_image> m_depth_buffer;
+		std::unique_ptr<vk::viewable_image> m_reactive_mask;
+		std::unique_ptr<vk::viewable_image> m_transparency_mask;
+		std::unique_ptr<vk::viewable_image> m_previous_color;
+		
+		// FSR3 passes
+		std::unique_ptr<FidelityFX::fsr3_upscale_pass> m_upscale_pass;
+		std::unique_ptr<FidelityFX::fsr3_temporal_pass> m_temporal_pass;
+		
+		// Frame tracking
+		u32 m_frame_count;
+		struct { f32 x, y; } m_jitter_offset;
 
 		void dispose_images();
-		void initialize_image(u32 output_w, u32 output_h, rsx::flags32_t mode);
+		void initialize_image(u32 input_w, u32 input_h, u32 output_w, u32 output_h, rsx::flags32_t mode);
+		void clear_auxiliary_buffers();
+		void update_motion_vectors(const vk::command_buffer& cmd);
+		void update_reactive_mask(const vk::command_buffer& cmd, vk::viewable_image* src);
 
 	public:
-		fsr3_upscale_pass() = default;
+		fsr3_upscale_pass();
 		~fsr3_upscale_pass();
 
 		vk::viewable_image* scale_output(
