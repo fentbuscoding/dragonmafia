@@ -133,7 +133,7 @@ namespace asmjit
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return vec_type(asmjit::x86::Vec::kIdXmm0 + idx);
+			return vec_type(idx);
 		}
 
 		template <u32 Size>
@@ -466,7 +466,9 @@ namespace asmjit
 		{
 			ensure(g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...) == asmjit::kErrorOk);
 			return vec_type(src1.id());
-		}			ensure(g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+		}
+
+	ensure(g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 			return vec_type(src1.id());
 		}
 		else do
