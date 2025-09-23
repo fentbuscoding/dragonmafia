@@ -377,18 +377,18 @@ namespace asmjit
 				if (op2 && utils::has_avx())
 				{
 					// Assume op2 is AVX (but could be PSHUFD as well for example)
-					ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+					ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...) == asmjit::kErrorOk);
 				}
 				else
 				{
 					// TODO
-					ensure(g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16))) == asmjit::kErrorOk);
+					ensure(g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16)) == asmjit::kErrorOk);
 					ensure(g_vc->emit(op, r, std::forward<Args>(args)...) == asmjit::kErrorOk);
 				}
 			}
 			else
 			{
-				ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+				ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...) == asmjit::kErrorOk);
 			}
 
 			return r;
@@ -528,7 +528,7 @@ namespace asmjit
 			}
 
 			// Fallback to arg copy
-			ensure(g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16))) == asmjit::kErrorOk);
+			ensure(g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16)) == asmjit::kErrorOk);
 		}
 		while (0);
 
@@ -538,11 +538,11 @@ namespace asmjit
 		}
 		else if (sse_op)
 		{
-			ensure(g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+			ensure(g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...) == asmjit::kErrorOk);
 		}
 		else
 		{
-			ensure(g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+			ensure(g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...) == asmjit::kErrorOk);
 		}
 
 		return vec_type::make_v128(src1.id());
