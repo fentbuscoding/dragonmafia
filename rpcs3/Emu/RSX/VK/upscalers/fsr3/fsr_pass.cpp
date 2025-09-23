@@ -1,6 +1,8 @@
 #include "../../vkutils/barriers.h"
+#include "../../vkutils/image_helpers.h"
 #include "../../VKHelpers.h"
 #include "../../VKResourceManager.h"
+#include "Emu/RSX/RSXTexture.h"
 
 #include "../fsr3_pass.h"
 
@@ -71,32 +73,32 @@ namespace vk
 			create();
 		}
 
-		std::vector<glsl::program_input> fsr3_pass::get_inputs()
+		std::vector<vk::glsl::program_input> fsr3_pass::get_inputs()
 		{
 			return
 			{
 				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_texture, {}, 0xFF, 0, "InputTexture" },
-				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_storage_image, {}, 0xFF, 1, "OutputTexture" }
+				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_storage_buffer, {}, 0xFF, 1, "OutputTexture" }
 			};
 		}
 
 		void fsr3_pass::bind_resources(const vk::command_buffer& /*cmd*/)
 		{
-			m_program->bind_uniform(m_sampler->value, 0, m_descriptor_sets);
-			m_program->bind_uniform((*m_input_image), 0, m_descriptor_sets);
-			m_program->bind_uniform((*m_output_image), 1, m_descriptor_sets);
+			m_program->bind_uniform(m_sampler->value, 0, descriptor_set);
+			m_program->bind_uniform((*m_input_image), 0, descriptor_set);
+			m_program->bind_uniform((*m_output_image), 1, descriptor_set);
 		}
 
 		void fsr3_pass::run(const vk::command_buffer& cmd, vk::viewable_image* src, vk::viewable_image* dst, const size2u& input_size, const size2u& output_size)
 		{
-			m_input_image = src->get_view(0xAAE4, rsx::default_remap_vector);
-			m_output_image = dst->get_view(0xAAE4, rsx::default_remap_vector);
+			m_input_image = src->get_view(rsx::default_remap_vector, VK_IMAGE_ASPECT_COLOR_BIT);
+			m_output_image = dst->get_view(rsx::default_remap_vector, VK_IMAGE_ASPECT_COLOR_BIT);
 			m_input_size = input_size;
 			m_output_size = output_size;
 
 			configure(cmd);
 
-			compute_task::run(cmd, (output_size.width + 7) / 8, (output_size.height + 7) / 8);
+			compute_task::run(cmd, (output_size.width + 7) / 8, (output_size.height + 7) / 8, 1);
 		}
 
 		fsr3_upscale_pass::fsr3_upscale_pass()
@@ -123,7 +125,7 @@ namespace vk
 				static_cast<f32>(src_image->width()), static_cast<f32>(src_image->height()),     // Size of the raw image to upscale (in case viewport does not cover it all)
 				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));  // Size of output viewport (target size)
 
-			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
+			load_program(cmd);
 		}
 
 		fsr3_temporal_pass::fsr3_temporal_pass()
@@ -150,7 +152,7 @@ namespace vk
 				static_cast<f32>(src_image->width()), static_cast<f32>(src_image->height()),     // Size of the raw image to upscale (in case viewport does not cover it all)
 				static_cast<f32>(m_output_size.width), static_cast<f32>(m_output_size.height));  // Size of output viewport (target size)
 
-			load_program(cmd, vk::glsl::program_domain::glsl_compute_program, m_constants_buf, push_constants_size);
+			load_program(cmd);
 		}
 	}
 
@@ -174,44 +176,46 @@ namespace vk
 		const VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
 		const VkImageUsageFlags usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		try
+		if (mode & vk::UPSCALE_LEFT_VIEW)
 		{
-			if (mode & vk::UPSCALE_LEFT_VIEW)
-			{
-				m_output_left = std::make_unique<vk::viewable_image>(
-					*vk::get_current_renderer(), 
-					vk::get_current_renderer()->get_memory_mapping().device_local, 
-					format, 
-					VK_IMAGE_TILING_OPTIMAL, 
-					usage, 
-					output_w, 
-					output_h, 
-					1, 1, 1, 
-					VK_SAMPLE_COUNT_1_BIT, 
-					VK_IMAGE_LAYOUT_GENERAL
-				);
-			}
-
-			if (mode & vk::UPSCALE_RIGHT_VIEW)
-			{
-				m_output_right = std::make_unique<vk::viewable_image>(
-					*vk::get_current_renderer(), 
-					vk::get_current_renderer()->get_memory_mapping().device_local, 
-					format, 
-					VK_IMAGE_TILING_OPTIMAL, 
-					usage, 
-					output_w, 
-					output_h, 
-					1, 1, 1, 
-					VK_SAMPLE_COUNT_1_BIT, 
-					VK_IMAGE_LAYOUT_GENERAL
-				);
-			}
+			m_output_left = std::make_unique<vk::viewable_image>(
+				*vk::get_current_renderer(), 
+				vk::get_current_renderer()->get_memory_mapping().device_local, 
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				VK_IMAGE_TYPE_2D,
+				format, 
+				output_w, 
+				output_h, 
+				1, 1, 1, 
+				VK_SAMPLE_COUNT_1_BIT, 
+				VK_IMAGE_LAYOUT_GENERAL,
+				VK_IMAGE_TILING_OPTIMAL, 
+				usage, 
+				0,
+				vmm_allocation_pool::VMM_ALLOCATION_POOL_TEXTURE_CACHE,
+				rsx::format_class::RSX_FORMAT_CLASS_COLOR
+			);
 		}
-		catch (const vk::exception& e)
+
+		if (mode & vk::UPSCALE_RIGHT_VIEW)
 		{
-			ensure(!m_output_left && !m_output_right && !m_intermediate_data);
-			rsx_log.error("FSR3 is not supported by this driver and hardware combination.");
+			m_output_right = std::make_unique<vk::viewable_image>(
+				*vk::get_current_renderer(), 
+				vk::get_current_renderer()->get_memory_mapping().device_local, 
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+				VK_IMAGE_TYPE_2D,
+				format, 
+				output_w, 
+				output_h, 
+				1, 1, 1, 
+				VK_SAMPLE_COUNT_1_BIT, 
+				VK_IMAGE_LAYOUT_GENERAL,
+				VK_IMAGE_TILING_OPTIMAL, 
+				usage, 
+				0,
+				vmm_allocation_pool::VMM_ALLOCATION_POOL_TEXTURE_CACHE,
+				rsx::format_class::RSX_FORMAT_CLASS_COLOR
+			);
 		}
 	}
 
@@ -261,13 +265,14 @@ namespace vk
 			blit_request.srcOffsets[0] = { 0, 0, 0 };
 			blit_request.srcOffsets[1] = { static_cast<s32>(output_w), static_cast<s32>(output_h), 1 };
 
-			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
-			vk::change_image_layout(cmd, present_surface, present_surface_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+			VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, range);
+			vk::change_image_layout(cmd, present_surface, present_surface_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
 
 			vkCmdBlitImage(cmd, output_image->value, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, present_surface, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit_request, VK_FILTER_LINEAR);
 
-			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
-			vk::change_image_layout(cmd, present_surface, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, present_surface_layout, vk::get_image_subresource_range(0, 0, 1, 1, VK_IMAGE_ASPECT_COLOR_BIT));
+			vk::change_image_layout(cmd, output_image->value, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, range);
+			vk::change_image_layout(cmd, present_surface, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, present_surface_layout, range);
 		}
 
 		return output_image;
