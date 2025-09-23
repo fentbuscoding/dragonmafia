@@ -2,6 +2,7 @@
 
 #include "../../glutils/fbo.h"
 #include "../fsr3_pass.h"
+#include "Emu/RSX/RSXTexture.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -184,18 +185,22 @@ namespace gl
 	{
 		dispose_images();
 
-		const GLenum ifmt = GL_RGBA8;
-		const GLenum fmt = GL_RGBA;
-		const GLenum type = GL_UNSIGNED_BYTE;
+		const auto initialize_image_impl = [&]()
+		{
+			return std::make_unique<gl::viewable_image>(
+				GL_TEXTURE_2D,
+				output_w, output_h, 1, 1, 1,
+				GL_RGBA8, RSX_FORMAT_CLASS_COLOR);
+		};
 
 		if (mode & gl::UPSCALE_LEFT_VIEW)
 		{
-			m_output_left = std::make_unique<gl::viewable_image>(output_w, output_h, GL_TEXTURE_2D, ifmt, fmt, type);
+			m_output_left = initialize_image_impl();
 		}
 
 		if (mode & gl::UPSCALE_RIGHT_VIEW) 
 		{
-			m_output_right = std::make_unique<gl::viewable_image>(output_w, output_h, GL_TEXTURE_2D, ifmt, fmt, type);
+			m_output_right = initialize_image_impl();
 		}
 	}
 
@@ -235,7 +240,7 @@ namespace gl
 
 		// Run FSR3 upscaling pass
 		static FidelityFX::fsr3_upscale_pass upscale_pass;
-		upscale_pass.run(cmd, src, output_image, { input_w, input_h }, { output_w, output_h });
+		upscale_pass.run(cmd, src, output_image, { static_cast<u32>(input_w), static_cast<u32>(input_h) }, { static_cast<u32>(output_w), static_cast<u32>(output_h) });
 
 		return output_image;
 	}
