@@ -127,8 +127,8 @@ namespace asmjit
 	template <typename F>
 	[[nodiscard]] inline asmjit::Label build_transaction_enter(asmjit::x86::Assembler& c, asmjit::Label fallback, F func)
 	{
-		Label fall = c.newLabel();
-		Label begin = c.newLabel();
+		Label fall = c.new_label();
+		Label begin = c.new_label();
 		c.jmp(begin);
 		c.bind(fall);
 
@@ -305,9 +305,9 @@ namespace asmjit
 			ensure((esize & (esize - 1)) == 0);
 			ensure(esize <= vsize);
 
-			Label body = this->newLabel();
-			Label next = this->newLabel();
-			Label exit = this->newLabel();
+			Label body = this->new_label();
+			Label next = this->new_label();
+			Label exit = this->new_label();
 
 			const u32 step = vsize / esize;
 
@@ -377,7 +377,7 @@ namespace asmjit
 					else
 					{
 						const u32 step = vsize / esize;
-						Label next = this->newLabel();
+						Label next = this->new_label();
 						this->cmp(reg_cnt, step);
 						this->jb(next);
 						build();
@@ -397,8 +397,8 @@ namespace asmjit
 	// for (; count > 0; ctr++, count--)
 	inline void build_loop(native_asm& c, auto ctr, auto count, auto&& build)
 	{
-		asmjit::Label body = c.newLabel();
-		asmjit::Label exit = c.newLabel();
+		asmjit::Label body = c.new_label();
+		asmjit::Label exit = c.new_label();
 
 		c.test(count, count);
 		c.jz(exit);
@@ -414,7 +414,7 @@ namespace asmjit
 	inline void maybe_flush_lbr(native_asm& c, uint count = 2)
 	{
 		// Workaround for bad LBR callstacks which happen in some situations (mainly TSX) - execute additional RETs
-		Label next = c.newLabel();
+		Label next = c.new_label();
 		c.lea(x86::rcx, x86::qword_ptr(next));
 
 		for (u32 i = 0; i < count; i++)
@@ -470,8 +470,8 @@ inline FT build_function_asm(std::string_view name, F&& builder, ::jit_runtime* 
 #endif
 
 	Asm compiler(&code);
-	compiler.addEncodingOptions(EncodingOptions::kOptimizedAlign);
-	compiler.addEncodingOptions(EncodingOptions::kOptimizeForSize);
+	compiler.add_encoding_options(EncodingOptions::kOptimizedAlign);
+	compiler.add_encoding_options(EncodingOptions::kOptimizeForSize);
 	if constexpr (std::is_invocable_r_v<bool, F, Asm&, native_args&>)
 	{
 		if (!builder(compiler, args))
@@ -489,7 +489,7 @@ inline FT build_function_asm(std::string_view name, F&& builder, ::jit_runtime* 
 	}
 
 	const auto result = rt._add(&code, reduced_size ? 16 : 64);
-	jit_announce(result, code.codeSize(), name);
+	jit_announce(result, code.code_size(), name);
 	return reinterpret_cast<FT>(uptr(result));
 }
 
