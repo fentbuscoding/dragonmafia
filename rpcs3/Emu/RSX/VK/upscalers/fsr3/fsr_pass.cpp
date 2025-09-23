@@ -73,26 +73,51 @@ namespace vk
 			create();
 		}
 
-		std::vector<vk::glsl::program_input> fsr3_pass::get_inputs()
+		std::vector<glsl::program_input> fsr3_pass::get_inputs()
 		{
-			return
+			std::vector<glsl::program_input> inputs = 
 			{
-				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_texture, {}, 0xFF, 0, "InputTexture" },
-				{ ::glsl::program_domain::glsl_compute_program, vk::glsl::input_type_storage_buffer, {}, 0xFF, 1, "OutputTexture" }
+				glsl::program_input::make(
+					::glsl::program_domain::glsl_compute_program,
+					"InputTexture",
+					vk::glsl::input_type_texture,
+					0,
+					0
+				),
+
+				glsl::program_input::make(
+					::glsl::program_domain::glsl_compute_program,
+					"OutputTexture", 
+					vk::glsl::input_type_storage_texture,
+					0,
+					1
+				),
 			};
+
+			auto result = compute_task::get_inputs();
+			result.insert(result.end(), inputs.begin(), inputs.end());
+			return result;
 		}
 
 		void fsr3_pass::bind_resources(const vk::command_buffer& /*cmd*/)
 		{
-			m_program->bind_uniform(m_sampler->value, 0, descriptor_set);
-			m_program->bind_uniform((*m_input_image), 0, descriptor_set);
-			m_program->bind_uniform((*m_output_image), 1, descriptor_set);
+			// Create sampler if needed
+			if (!m_sampler)
+			{
+				const auto pdev = vk::get_current_renderer();
+				m_sampler = std::make_unique<vk::sampler>(*pdev,
+					VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+					VK_FALSE, 0.f, 1.f, 0.f, 0.f, VK_FILTER_LINEAR, VK_FILTER_LINEAR, VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+			}
+
+			m_program->bind_uniform({ m_sampler->value, m_input_image->value, m_input_image->image()->current_layout }, 0, 0);
+			m_program->bind_uniform({ VK_NULL_HANDLE, m_output_image->value, m_output_image->image()->current_layout }, 0, 1);
 		}
 
 		void fsr3_pass::run(const vk::command_buffer& cmd, vk::viewable_image* src, vk::viewable_image* dst, const size2u& input_size, const size2u& output_size)
 		{
-			m_input_image = src->get_view(rsx::default_remap_vector, VK_IMAGE_ASPECT_COLOR_BIT);
-			m_output_image = dst->get_view(rsx::default_remap_vector, VK_IMAGE_ASPECT_COLOR_BIT);
+			m_input_image = src->get_view(rsx::default_remap_vector.with_encoding(VK_REMAP_IDENTITY));
+			m_output_image = dst->get_view(rsx::default_remap_vector.with_encoding(VK_REMAP_IDENTITY));
 			m_input_size = input_size;
 			m_output_size = output_size;
 
