@@ -426,13 +426,11 @@ namespace asmjit
 			// Use src1 as a destination
 			src1 = arg_eval(std::forward<A>(a), 16);
 
-			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
-			{
-				ensure(!g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
-			}
-
-			if constexpr (arg_classify<B> == arg_class::reg_rv)
+		if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
+		{
+			ensure(g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...) == asmjit::kErrorOk);
+			return vec_type::make_v128(src1.id());
+		}			if constexpr (arg_classify<B> == arg_class::reg_rv)
 			{
 				e.x = b;
 			}
@@ -464,14 +462,12 @@ namespace asmjit
 				}
 			}
 
-			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
-			{
-				ensure(!g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
-			}
-
-			ensure(g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
-			return vec_type{src1.id()};
+		if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
+		{
+			ensure(g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...) == asmjit::kErrorOk);
+			return vec_type::make_v128(src1.id());
+		}			ensure(g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
+			return vec_type::make_v128(src1.id());
 		}
 		else do
 		{
@@ -534,7 +530,7 @@ namespace asmjit
 
 		if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 		{
-			ensure(!g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
+			ensure(g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...) == asmjit::kErrorOk);
 		}
 		else if (sse_op)
 		{
@@ -545,7 +541,7 @@ namespace asmjit
 			ensure(g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...)) == asmjit::kErrorOk);
 		}
 
-		return vec_type{src1.id()};
+		return vec_type::make_v128(src1.id());
 	}
 #define FOR_X64(f, ...) do { using enum asmjit::x86::Inst::Id; return asmjit::f(__VA_ARGS__); } while (0)
 #elif defined(ARCH_ARM64)
@@ -2471,7 +2467,7 @@ inline asmjit::vec_type gv_signselect8(A&& bits, B&& _true, C&& _false)
 	}
 #endif
 	g_vc->fail_flag = true;
-	return vec_type{0};
+	return vec_type::make_v128(0);
 }
 
 // Select elements; _cmp must be result of SIMD comparison; undefined otherwise
