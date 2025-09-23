@@ -128,12 +128,12 @@ namespace asmjit
 			if (!~vec_allocated)
 			{
 				fail_flag = true;
-				return vec_type{0};
+				return vec_type();
 			}
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return vec_type{idx};
+			return vec_type(asmjit::x86::Vec::kIdXmm0 + idx);
 		}
 
 		template <u32 Size>
@@ -183,21 +183,21 @@ namespace asmjit
 			if (Size == 16 && esize == 4 && key._u64[0] == key._u64[1] && key._u32[0] == key._u32[1])
 			{
 				x86::Mem r = get_const<u32>(key._u32[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To4);
+				r.set_broadcast(x86::Mem::Broadcast::k1To4);
 				return r;
 			}
 
 			if (Size == 16 && esize == 8 && key._u64[0] == key._u64[1])
 			{
 				x86::Mem r = get_const<u64>(key._u64[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To2);
+				r.set_broadcast(x86::Mem::Broadcast::k1To2);
 				return r;
 			}
 
 			auto& _label = consts[Size - 1][key];
 
-			if (!_label.isValid())
-				_label = base::newLabel();
+			if (!_label.is_valid())
+				_label = base::new_label();
 
 			return x86::Mem(_label, 0, Size);
 		}
@@ -244,34 +244,34 @@ namespace asmjit
 				{
 					if (_c._u8[0] == _c._u8[1])
 					{
-						ensure(!g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0])));
+						ensure(g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0])) == asmjit::kErrorOk);
 					}
 					else
 					{
-						ensure(!g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0])));
+						ensure(g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0])) == asmjit::kErrorOk);
 					}
 				}
 				else
 				{
-					ensure(!g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0])));
+					ensure(g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0])) == asmjit::kErrorOk);
 				}
 			}
 			else
 			{
-				ensure(!g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0])));
+				ensure(g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0])) == asmjit::kErrorOk);
 			}
 		}
 		else if (!_c._u)
 		{
-			ensure(!g_vc->pxor(reg, reg));
+			ensure(g_vc->pxor(reg, reg) == asmjit::kErrorOk);
 		}
 		else if (!~_c._u)
 		{
-			ensure(!g_vc->pcmpeqd(reg, reg));
+			ensure(g_vc->pcmpeqd(reg, reg) == asmjit::kErrorOk);
 		}
 		else
 		{
-			ensure(!g_vc->movaps(reg, g_vc->get_const(_c, esize)));
+			ensure(g_vc->movaps(reg, g_vc->get_const(_c, esize)) == asmjit::kErrorOk);
 		}
 
 		g_vc->const_allocs.emplace(_c, reg);
@@ -321,9 +321,9 @@ namespace asmjit
 
 	inline void arg_free(const Operand& op)
 	{
-		if (op.isReg())
+		if (op.is_reg())
 		{
-			g_vc->vec_dealloc(vec_type{op.id()});
+			g_vc->vec_dealloc(vec_type(asmjit::x86::Vec::kIdXmm0 + op.id()));
 		}
 	}
 
@@ -335,16 +335,16 @@ namespace asmjit
 			return g_vc->const_allocs.count(op) == 0;
 		else if constexpr (_class == arg_class::imm_lv)
 			return false;
-		else if (op.isMem())
+		else if (op.is_mem())
 		{
 			// Check if broadcast is set, or if the offset immediate can use disp8*N encoding
 			mem_type mem{};
-			mem.copyFrom(op);
-			if (mem.hasBaseLabel())
+			mem.copy_from(op);
+			if (mem.has_base_label())
 				return false;
-			if (mem.hasBroadcast())
+			if (mem.has_broadcast())
 				return true;
-			if (!mem.hasOffset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
+			if (!mem.has_offset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
 				return false;
 			return true;
 		}
@@ -359,11 +359,11 @@ namespace asmjit
 		{
 			if (op)
 			{
-				ensure(!g_vc->emit(op, a, std::forward<Args>(args)...));
+				ensure(g_vc->emit(op, a, std::forward<Args>(args)...) == asmjit::kErrorOk);
 			}
 			else
 			{
-				ensure(!g_vc->emit(op2, a, a, std::forward<Args>(args)...));
+				ensure(g_vc->emit(op2, a, a, std::forward<Args>(args)...) == asmjit::kErrorOk);
 			}
 
 			return a;
@@ -383,7 +383,7 @@ namespace asmjit
 				{
 					// TODO
 					ensure(!g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16)));
-					ensure(!g_vc->emit(op, r, std::forward<Args>(args)...));
+					ensure(g_vc->emit(op, r, std::forward<Args>(args)...) == asmjit::kErrorOk);
 				}
 			}
 			else
@@ -516,13 +516,13 @@ namespace asmjit
 				if (!a._u)
 				{
 					// All zeros
-					ensure(!g_vc->emit(x86::Inst::kIdPxor, src1, src1));
+					ensure(g_vc->emit(x86::Inst::kIdPxor, src1, src1) == asmjit::kErrorOk);
 					break;
 				}
 				else if (!~a._u)
 				{
 					// All ones
-					ensure(!g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1));
+					ensure(g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1) == asmjit::kErrorOk);
 					break;
 				}
 			}
