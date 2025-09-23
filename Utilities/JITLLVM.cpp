@@ -128,7 +128,7 @@ static u64 make_null_function(const std::string& name)
 			c.align(AlignMode::kData, 16);
 			c.bind(data);
 			c.embed(name.c_str(), name.size());
-			c.db(0U);
+			c.embed_uint8(0U);
 			c.align(AlignMode::kData, 16);
 #endif
 		});
