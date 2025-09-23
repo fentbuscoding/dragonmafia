@@ -74,7 +74,7 @@ static constexpr spu_opcode_t s_op{};
 namespace asmjit
 {
 	template <uint I, uint N>
-	static void build_spu_gpr_load(x86::Assembler& c, x86::Xmm x, const bf_t<u32, I, N>&, bool store = false)
+	static void build_spu_gpr_load(x86::Assembler& c, x86::Vec x, const bf_t<u32, I, N>&, bool store = false)
 	{
 		static_assert(N == 7, "Invalid bitfield");
 
@@ -118,7 +118,7 @@ namespace asmjit
 	}
 
 	template <uint I, uint N>
-	static void build_spu_gpr_store(x86::Assembler& c, x86::Xmm x, const bf_t<u32, I, N>&, bool store = true)
+	static void build_spu_gpr_store(x86::Assembler& c, x86::Vec x, const bf_t<u32, I, N>&, bool store = true)
 	{
 		build_spu_gpr_load(c, x, bf_t<u32, I, N>{}, store);
 	}
