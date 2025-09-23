@@ -330,11 +330,11 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	c.mov(a64::x19, Imm(reinterpret_cast<u64>(&vm::g_exec_addr)));
 	c.ldr(a64::x19, a64::Mem(a64::x19));
 	// Load PPUThread struct base -> REG_Sp
-	const arm::GpX ppu_t_base = a64::x20;
+	const a64::GpX ppu_t_base = a64::x20;
 	c.mov(ppu_t_base, args[0]);
 	// Load PC
-	const arm::GpX pc = a64::x15;
-	const arm::GpX cia_addr_reg = a64::x11;
+	const a64::GpX pc = a64::x15;
+	const a64::GpX cia_addr_reg = a64::x11;
 	// Load offset value
 	c.mov(cia_addr_reg, Imm(static_cast<u64>(::offset32(&ppu_thread::cia))));
 	// Load cia
@@ -344,12 +344,12 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	c.add(pc, pc, pc);
 
 	// Load call target
-	const arm::GpX call_target = a64::x13;
+	const a64::GpX call_target = a64::x13;
 	c.ldr(call_target, a64::Mem(a64::x19, pc));
 	// Compute REG_Hp
-	const arm::GpX reg_hp = a64::x21;
+	const a64::GpX reg_hp = a64::x21;
 	c.mov(reg_hp, Imm(vm::g_exec_addr_seg_offset));
-	c.add(reg_hp, reg_hp, pc, arm::Shift(arm::ShiftOp::kLSR, 2));
+	c.add(reg_hp, reg_hp, pc, a64::Shift(a64::ShiftOp::kLSR, 2));
 	c.ldrh(reg_hp.w(), a64::Mem(a64::x19, reg_hp));
 	c.lsl(reg_hp.w(), reg_hp.w(), 13);
 
@@ -357,7 +357,7 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	c.mov(a64::x22, Imm(reinterpret_cast<u64>(&vm::g_base_addr)));
 	c.ldr(a64::x22, a64::Mem(a64::x22));
 
-	const arm::GpX gpr_addr_reg = a64::x9;
+	const a64::GpX gpr_addr_reg = a64::x9;
 	c.mov(gpr_addr_reg, Imm(static_cast<u64>(::offset32(&ppu_thread::gpr))));
 	c.add(gpr_addr_reg, gpr_addr_reg, ppu_t_base);
 	c.ldr(a64::x23, a64::Mem(gpr_addr_reg));
@@ -421,7 +421,7 @@ const extern auto ppu_escape = build_function_asm<void(*)(ppu_thread*)>("ppu_esc
 #else
 	// We really shouldn't be using this, but an implementation shoudln't hurt
 	// Far jump return. Only clobbers x30.
-	const arm::GpX ppu_t_base = a64::x20;
+	const a64::GpX ppu_t_base = a64::x20;
 	const u64 hv_register_array_offset = ::offset32(&ppu_thread::hv_ctx, &rpcs3::hypervisor_context_t::regs);
 	c.mov(ppu_t_base, args[0]);
 	c.mov(a64::x30, Imm(hv_register_array_offset));
@@ -5107,17 +5107,15 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			c.jmp(x86::rcx);
 #else
 			// Load REG_Base - use absolute jump target to bypass rel jmp range limits
-			// X19 contains vm::g_exec_addr
-			const arm::GpX exec_addr = a64::x19;
+		// X19 contains vm::g_exec_addr
+		const a64::GpX exec_addr = a64::x19;
 
-			// X20 contains ppu_thread*
-			const arm::GpX ppu_t_base = a64::x20;
+		// X20 contains ppu_thread*
+		const a64::GpX ppu_t_base = a64::x20;
 
-			// Load PC
-			const arm::GpX pc = a64::x15;
-			const arm::GpX cia_addr_reg = a64::x11;
-
-		// Load CIA
+		// Load PC
+		const a64::GpX pc = a64::x15;
+		const a64::GpX cia_addr_reg = a64::x11;		// Load CIA
 		c.mov(pc.w(), func_addr);
 
 		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
@@ -5133,13 +5131,13 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			c.add(pc, pc, pc);
 
 			// Load call target
-			const arm::GpX call_target = a64::x13;
+			const a64::GpX call_target = a64::x13;
 			c.ldr(call_target, a64::Mem(exec_addr, pc));
 
 			// Compute REG_Hp
-			const arm::GpX reg_hp = a64::x21;
+			const a64::GpX reg_hp = a64::x21;
 			c.mov(reg_hp, Imm(vm::g_exec_addr_seg_offset));
-			c.add(reg_hp, reg_hp, pc, arm::Shift(arm::ShiftOp::kLSR, 2));
+			c.add(reg_hp, reg_hp, pc, a64::Shift(a64::ShiftOp::kLSR, 2));
 			c.ldrh(reg_hp.w(), a64::Mem(exec_addr, reg_hp));
 			c.lsl(reg_hp.w(), reg_hp.w(), 13);
 
