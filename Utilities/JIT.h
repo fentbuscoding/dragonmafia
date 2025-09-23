@@ -11,7 +11,8 @@
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
+#include <asmjit/x86.h>
 #pragma warning(pop)
 #else
 #pragma GCC diagnostic push
@@ -30,7 +31,8 @@
 #pragma GCC diagnostic ignored "-Wduplicated-branches"
 #pragma GCC diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #endif
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
+#include <asmjit/x86.h>
 #if defined(ARCH_ARM64)
 #include <asmjit/a64.h>
 #endif
