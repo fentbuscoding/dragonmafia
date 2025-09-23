@@ -617,10 +617,10 @@ const auto spu_putllc_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime, void*
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label fail = c.newLabel();
-	Label _ret = c.newLabel();
-	Label load = c.newLabel();
+	Label fall = c.new_label();
+	Label fail = c.new_label();
+	Label _ret = c.new_label();
+	Label load = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{
@@ -702,7 +702,7 @@ const auto spu_putllc_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime, void*
 	const auto stamp0 = args[0];
 	build_get_tsc(c, stamp0);
 
-	Label fail2 = c.newLabel();
+	Label fail2 = c.new_label();
 
 	Label tx1 = build_transaction_enter(c, fall, [&]()
 	{
@@ -887,8 +887,8 @@ const auto spu_putlluc_tx = build_function_asm<u64(*)(u32 raddr, const void* rda
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label _ret = c.newLabel();
+	Label fall = c.new_label();
+	Label _ret = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{
@@ -1022,8 +1022,8 @@ const auto spu_getllar_tx = build_function_asm<u64(*)(u32 raddr, void* rdata, cp
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label _ret = c.newLabel();
+	Label fall = c.new_label();
+	Label _ret = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{

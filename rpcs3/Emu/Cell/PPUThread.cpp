@@ -306,7 +306,7 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	// x18, x19...x30
 	// NOTE: Do not touch x19..x30 before saving the registers!
 	const u64 hv_register_array_offset = ::offset32(&ppu_thread::hv_ctx, &rpcs3::hypervisor_context_t::regs);
-	Label hv_ctx_pc = c.newLabel(); // Used to hold the far jump return address
+	Label hv_ctx_pc = c.new_label(); // Used to hold the far jump return address
 
 	// Sanity
 	ensure(hv_register_array_offset < 4096); // Imm10
@@ -445,8 +445,8 @@ const auto ppu_recompiler_fallback_ghc = build_function_asm<void(*)(ppu_thread& 
 {
 	using namespace asmjit;
 
-	Label fallback_fn = c.newLabel();
-	Label escape_fn = c.newLabel();
+	Label fallback_fn = c.new_label();
+	Label escape_fn = c.new_label();
 
 	// This is called as GHC so the first arg is in x20.
 	// Fix up the arg registers and call the real function.
@@ -1008,8 +1008,8 @@ struct ppu_far_jumps_t
 				c.mov(x86::dword_ptr(args[0], ::offset32(&ppu_thread::cia)), pc);
 				c.jmp(ppu_far_jump);
 #else
-				Label jmp_address = c.newLabel();
-				Label imm_address = c.newLabel();
+				Label jmp_address = c.new_label();
+				Label imm_address = c.new_label();
 
 				c.ldr(args[1].w(), arm::ptr(imm_address));
 				c.str(args[1].w(), arm::Mem(args[0], ::offset32(&ppu_thread::cia)));
@@ -3160,10 +3160,10 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label fail = c.newLabel();
-	Label _ret = c.newLabel();
-	Label load = c.newLabel();
+	Label fall = c.new_label();
+	Label fail = c.new_label();
+	Label _ret = c.new_label();
+	Label load = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{
@@ -3222,7 +3222,7 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	const auto stamp0 = x86::r14;
 	build_get_tsc(c, stamp0);
 
-	Label fail2 = c.newLabel();
+	Label fail2 = c.new_label();
 
 	Label tx1 = build_transaction_enter(c, fall, [&]()
 	{
@@ -5087,14 +5087,12 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 		auto func = build_function_asm<u8*(*)(ppu_thread&, u64, u8*, u64, u64, u64)>(name, [&](native_asm& c, auto& /*args*/)
 		{
 #if defined(ARCH_X64)
-			c.mov(x86::edx, func_addr - seg0); // Load PC
+		c.mov(x86::edx, func_addr - seg0); // Load PC
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());
 
-			code_size_until_jump = buf_end - buf_start;
-
-			c.add(x86::edx, seg0);
+		code_size_until_jump = buf_end - buf_start;			c.add(x86::edx, seg0);
 			c.movabs(x86::rax, reinterpret_cast<u64>(&vm::g_exec_addr));
 			c.mov(x86::rax, x86::qword_ptr(x86::rax));
 			c.mov(x86::dword_ptr(x86::rbp, ::offset32(&ppu_thread::cia)), x86::edx);
@@ -5119,15 +5117,13 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			const arm::GpX pc = a64::x15;
 			const arm::GpX cia_addr_reg = a64::x11;
 
-			// Load CIA
-			c.mov(pc.w(), func_addr);
+		// Load CIA
+		c.mov(pc.w(), func_addr);
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());
 
-			code_size_until_jump = buf_end - buf_start;
-
-			// Load offset value
+		code_size_until_jump = buf_end - buf_start;			// Load offset value
 			c.mov(cia_addr_reg, static_cast<u64>(::offset32(&ppu_thread::cia)));
 
 			// Update CIA

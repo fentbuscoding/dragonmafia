@@ -1919,17 +1919,17 @@ auto gen_ghc_cpp_trampoline(ppu_intrp_func_t fn_target)
 		// Take second ghc arg
 		c.mov(args[0], a64::x20);
 
-		Label cia_offset = c.newLabel();
+		Label cia_offset = c.new_label();
 		c.ldr(a64::x11, arm::Mem(cia_offset));
 		c.ldr(a64::x26, arm::Mem(args[0], a64::x11));
 
-		Label base_addr = c.newLabel();
+		Label base_addr = c.new_label();
 		c.ldr(a64::x22, arm::Mem(base_addr));
 		c.ldr(a64::x22, arm::Mem(a64::x22));
 
 		c.add(args[2], a64::x22, a64::x26);
 
-		Label jmp_target = c.newLabel();
+		Label jmp_target = c.new_label();
 		c.ldr(a64::x22, arm::Mem(jmp_target));
 		c.br(a64::x22);
 
