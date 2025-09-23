@@ -38,7 +38,7 @@ namespace asmjit
 	struct vec_builder;
 }
 
-inline thread_local asmjit::simd_builder* g_vc = nullptr;
+inline thread_local asmjit::vec_builder* g_vc = nullptr;
 
 namespace asmjit
 {
@@ -214,10 +214,10 @@ namespace asmjit
 
 		~free_on_exit()
 		{
-			if (x.isReg())
+			if (x.is_reg())
 			{
 				vec_type v;
-				v.copyFrom(x);
+				v.copy_from(x);
 				g_vc->vec_dealloc(v);
 			}
 		}
