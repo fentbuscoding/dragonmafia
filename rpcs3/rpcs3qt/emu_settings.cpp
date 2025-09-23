@@ -407,6 +407,100 @@ void emu_settings::EnhanceComboBox(QComboBox* combobox, emu_settings_type type, 
 	});
 }
 
+void emu_settings::PopulateOutputScalingMode(QComboBox* combobox, bool is_vulkan)
+{
+	if (!combobox)
+	{
+		cfg_log.fatal("PopulateOutputScalingMode was used with an invalid object");
+		return;
+	}
+
+	// Clear existing items
+	combobox->clear();
+
+	// Get all output scaling mode options from the enum
+	const QStringList settings = GetQStringSettingOptions(emu_settings_type::OutputScalingMode);
+	
+	for (int i = 0; i < settings.count(); i++)
+	{
+		const QString& setting = settings[i];
+		
+		// Skip FSR3 if not using Vulkan
+		if (setting == "fsr3" && !is_vulkan)
+		{
+			continue;
+		}
+		
+		const QString localized_setting = GetLocalizedSetting(setting, emu_settings_type::OutputScalingMode, i, true);
+		combobox->addItem(localized_setting, QVariant({setting, i}));
+	}
+
+	// Set current value
+	const std::string selected = GetSetting(emu_settings_type::OutputScalingMode);
+	const QString selected_q = QString::fromStdString(selected);
+	
+	// Find the index of the current setting
+	int index = -1;
+	for (int i = 0; i < combobox->count(); i++)
+	{
+		const QVariantList var_list = combobox->itemData(i).toList();
+		if (var_list.size() == 2 && var_list[0].canConvert<QString>() && selected_q == var_list[0].toString())
+		{
+			index = i;
+			break;
+		}
+	}
+
+	// If FSR3 was selected but we're using OpenGL, fall back to FSR1
+	if (index == -1 && selected == "fsr3" && !is_vulkan)
+	{
+		// Find FSR1 as fallback
+		for (int i = 0; i < combobox->count(); i++)
+		{
+			const QVariantList var_list = combobox->itemData(i).toList();
+			if (var_list.size() == 2 && var_list[0].canConvert<QString>() && var_list[0].toString() == "fsr")
+			{
+				index = i;
+				SetSetting(emu_settings_type::OutputScalingMode, "fsr"); // Auto-switch to FSR1
+				break;
+			}
+		}
+	}
+
+	// If still not found, use default
+	if (index == -1)
+	{
+		const std::string def = GetSettingDefault(emu_settings_type::OutputScalingMode);
+		for (int i = 0; i < combobox->count(); i++)
+		{
+			const QVariantList var_list = combobox->itemData(i).toList();
+			if (var_list.size() == 2 && var_list[0].canConvert<QString>() && var_list[0].toString() == QString::fromStdString(def))
+			{
+				index = i;
+				break;
+			}
+		}
+	}
+
+	if (index != -1)
+	{
+		combobox->setCurrentIndex(index);
+	}
+
+	// Connect signal for changes
+	connect(combobox, QOverload<int>::of(&QComboBox::currentIndexChanged), combobox, [this, combobox](int index)
+	{
+		if (index < 0) return;
+
+		const QVariantList var_list = combobox->itemData(index).toList();
+		if (var_list.size() != 2 || !var_list[0].canConvert<QString>())
+		{
+			fmt::throw_exception("Invalid data found in combobox entry %d (text='%s', listsize=%d, itemcount=%d)", index, combobox->itemText(index), var_list.size(), combobox->count());
+		}
+		SetSetting(emu_settings_type::OutputScalingMode, var_list[0].toString().toStdString());
+	});
+}
+
 void emu_settings::EnhanceCheckBox(QCheckBox* checkbox, emu_settings_type type)
 {
 	if (!checkbox)
@@ -1065,6 +1159,7 @@ QString emu_settings::GetLocalizedSetting(const QString& original, emu_settings_
 		case output_scaling_mode::nearest: return tr("Nearest", "Output Scaling Mode");
 		case output_scaling_mode::bilinear: return tr("Bilinear", "Output Scaling Mode");
 		case output_scaling_mode::fsr: return tr("FidelityFX Super Resolution 1", "Output Scaling Mode");
+		case output_scaling_mode::fsr3: return tr("FidelityFX Super Resolution 3", "Output Scaling Mode");
 		}
 		break;
 	case emu_settings_type::AudioRenderer:

@@ -567,7 +567,6 @@ if(NOT ANDROID)
         RSX/GL/GLVertexProgram.cpp
         RSX/GL/OpenGL.cpp
         RSX/GL/upscalers/fsr1/fsr_pass.cpp
-        RSX/GL/upscalers/fsr3/fsr_pass.cpp
     )
 endif()
 

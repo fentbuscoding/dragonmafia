@@ -635,7 +635,7 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	});
 	SubscribeTooltip(ui->gbZCULL, tooltips.settings.zcull_operation_mode);
 
-	m_emu_settings->EnhanceComboBox(ui->outputScalingMode, emu_settings_type::OutputScalingMode);
+	// Initialize output scaling mode - will be populated by apply_renderer_specific_options
 	SubscribeTooltip(ui->outputScalingMode, tooltips.settings.output_scaling_mode);
 
 	// 3D
@@ -919,12 +919,16 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 		const bool is_vulkan = (text == r_creator->Vulkan.name);
 		ui->asyncTextureStreaming->setEnabled(is_vulkan);
 		ui->vulkansched->setEnabled(is_vulkan);
+		
+		// Update output scaling mode combo box based on renderer
+		m_emu_settings->PopulateOutputScalingMode(ui->outputScalingMode, is_vulkan);
 	};
 
 	const auto apply_fsr_specific_options = [r_creator, this]()
 	{
 		const auto [text, value] = get_data(ui->outputScalingMode, ui->outputScalingMode->currentIndex());
-		const bool fsr_selected = static_cast<output_scaling_mode>(value) == output_scaling_mode::fsr;
+		const auto scaling_mode = static_cast<output_scaling_mode>(value);
+		const bool fsr_selected = (scaling_mode == output_scaling_mode::fsr || scaling_mode == output_scaling_mode::fsr3);
 		ui->fsrSharpeningStrength->setEnabled(fsr_selected);
 		ui->fsrSharpeningStrengthReset->setEnabled(fsr_selected);
 	};
