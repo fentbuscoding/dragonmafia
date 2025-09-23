@@ -73,6 +73,7 @@ namespace vk
 		void clear_auxiliary_buffers();
 		void update_motion_vectors(const vk::command_buffer& cmd);
 		void update_reactive_mask(const vk::command_buffer& cmd, vk::viewable_image* src);
+		float get_quality_scale_factor() const;
 
 	public:
 		fsr3_upscale_pass();

@@ -47,6 +47,7 @@ target_include_directories(rpcs3_emu
 target_include_directories(rpcs3_emu
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/../../3rdparty
+        ${CMAKE_CURRENT_SOURCE_DIR}/RSX/Program/Upscalers/FSR3
 )
 
 # Utilities
@@ -160,6 +161,14 @@ if(WIN32)
     )
     target_compile_definitions(rpcs3_emu PRIVATE UNICODE _UNICODE _WIN32_WINNT=0x0A00)
     target_link_libraries(rpcs3_emu PRIVATE pdh bcrypt)
+    
+    # FSR3 Windows-specific optimizations
+    if(TARGET 3rdparty_vulkan)
+        target_compile_definitions(rpcs3_emu PRIVATE 
+            FSR3_ENABLE_WINDOWS_OPTIMIZATIONS=1
+            FSR3_VULKAN_EXTENSIONS=1
+        )
+    endif()
 endif()
 
 # Cell

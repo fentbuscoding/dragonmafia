@@ -637,6 +637,10 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 
 	// Initialize output scaling mode - will be populated by apply_renderer_specific_options
 	SubscribeTooltip(ui->outputScalingMode, tooltips.settings.output_scaling_mode);
+	
+	// Initialize FSR3 quality mode
+	m_emu_settings->EnhanceComboBox(ui->fsr3QualityMode, emu_settings_type::FSR3QualityMode);
+	SubscribeTooltip(ui->fsr3QualityMode, tooltips.settings.fsr3_quality_mode);
 
 	// 3D
 	m_emu_settings->EnhanceComboBox(ui->stereoRenderMode, emu_settings_type::StereoRenderMode);
@@ -779,6 +783,7 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	};
 	m_emu_settings->EnhanceSlider(ui->fsrSharpeningStrength, emu_settings_type::FsrSharpeningStrength);
 	SubscribeTooltip(ui->fsrSharpeningStrengthWidget, tooltips.settings.fsr_rcas_strength);
+	SubscribeTooltip(ui->fsr3QualityWidget, tooltips.settings.fsr3_quality_mode);
 	ui->fsrSharpeningStrengthVal->setText(fmt_fsr_sharpening_strength(ui->fsrSharpeningStrength->value()));
 	connect(ui->fsrSharpeningStrength, &QSlider::valueChanged, [fmt_fsr_sharpening_strength, this](int value)
 	{
@@ -929,8 +934,14 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 		const auto [text, value] = get_data(ui->outputScalingMode, ui->outputScalingMode->currentIndex());
 		const auto scaling_mode = static_cast<output_scaling_mode>(value);
 		const bool fsr_selected = (scaling_mode == output_scaling_mode::fsr || scaling_mode == output_scaling_mode::fsr3);
+		const bool fsr3_selected = (scaling_mode == output_scaling_mode::fsr3);
+		
+		// FSR1/FSR3 sharpening controls
 		ui->fsrSharpeningStrength->setEnabled(fsr_selected);
 		ui->fsrSharpeningStrengthReset->setEnabled(fsr_selected);
+		
+		// FSR3 quality mode controls
+		ui->fsr3QualityWidget->setVisible(fsr3_selected);
 	};
 
 	// Handle connects to disable specific checkboxes that depend on GUI state.

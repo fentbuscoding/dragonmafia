@@ -702,6 +702,23 @@ void fmt_class_string<output_scaling_mode>::format(std::string& out, u64 arg)
 }
 
 template <>
+void fmt_class_string<fsr3_quality_mode>::format(std::string& out, u64 arg)
+{
+	format_enum(out, arg, [](fsr3_quality_mode value)
+	{
+		switch (value)
+		{
+		case fsr3_quality_mode::quality: return "Quality";
+		case fsr3_quality_mode::balanced: return "Balanced";
+		case fsr3_quality_mode::performance: return "Performance";
+		case fsr3_quality_mode::ultra_performance: return "Ultra Performance";
+		}
+
+		return unknown;
+	});
+}
+
+template <>
 void fmt_class_string<xfloat_accuracy>::format(std::string& out, u64 arg)
 {
 	format_enum(out, arg, [](xfloat_accuracy value)

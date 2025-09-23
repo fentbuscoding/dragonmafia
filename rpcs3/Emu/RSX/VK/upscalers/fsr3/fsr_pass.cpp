@@ -3,6 +3,7 @@
 #include "../../VKHelpers.h"
 #include "../../VKResourceManager.h"
 #include "Emu/RSX/RSXTexture.h"
+#include "Emu/system_config.h"
 
 #include "../fsr3_pass.h"
 
@@ -42,7 +43,7 @@ namespace vk
 
 			// Replacements
 			const char* ffx_a_contents =
-				#include "Emu/RSX/Program/Upscalers/FSR1/fsr_ffx_a_flattened.inc"
+				#include "Emu/RSX/Program/Upscalers/FSR3/fsr_ffx_a_flattened.inc"
 			;
 
 			const char* ffx_fsr_contents =
@@ -330,12 +331,36 @@ namespace vk
 		// For now, we'll rely on the FSR3 implementation to handle uninitialized data gracefully
 	}
 
+	float fsr3_upscale_pass::get_quality_scale_factor() const
+	{
+		// Get the current FSR3 quality mode from configuration
+		const auto quality_mode = g_cfg.video.fsr3_quality.get();
+		
+		switch (quality_mode)
+		{
+		case fsr3_quality_mode::quality:
+			return 1.5f; // 1.5x upscaling (higher quality)
+		case fsr3_quality_mode::balanced:
+			return 1.7f; // 1.7x upscaling (balanced)
+		case fsr3_quality_mode::performance:
+			return 2.0f; // 2.0x upscaling (performance)
+		case fsr3_quality_mode::ultra_performance:
+			return 3.0f; // 3.0x upscaling (ultra performance)
+		default:
+			return 1.7f; // Default to balanced
+		}
+	}
+
 	void fsr3_upscale_pass::update_motion_vectors(const vk::command_buffer& cmd)
 	{
 		// Motion vector estimation - for now generate simple camera-based motion
 		// In a real implementation, this would analyze frame differences or use game-provided motion data
 		
-		// Generate simple jitter pattern for temporal accumulation
+		// Adjust jitter pattern based on quality mode
+		const auto quality_mode = g_cfg.video.fsr3_quality.get();
+		const bool use_enhanced_jitter = (quality_mode == fsr3_quality_mode::quality);
+		
+		// Generate jitter pattern for temporal accumulation
 		const float jitter_patterns[][2] = {
 			{ 0.0f,  0.0f},
 			{ 0.5f,  0.5f},
@@ -347,11 +372,16 @@ namespace vk
 			{ 0.75f, 0.25f}
 		};
 		
-		const u32 pattern_count = sizeof(jitter_patterns) / sizeof(jitter_patterns[0]);
+		// Use more jitter patterns for higher quality
+		const u32 pattern_count = use_enhanced_jitter ? 
+			sizeof(jitter_patterns) / sizeof(jitter_patterns[0]) : 4;
 		const u32 jitter_index = m_frame_count % pattern_count;
 		
-		m_jitter_offset.x = jitter_patterns[jitter_index][0];
-		m_jitter_offset.y = jitter_patterns[jitter_index][1];
+		// Scale jitter based on quality mode
+		const float jitter_scale = use_enhanced_jitter ? 0.5f : 1.0f;
+		
+		m_jitter_offset.x = jitter_patterns[jitter_index][0] * jitter_scale;
+		m_jitter_offset.y = jitter_patterns[jitter_index][1] * jitter_scale;
 	}
 
 	void fsr3_upscale_pass::update_reactive_mask(const vk::command_buffer& cmd, vk::viewable_image* src)
@@ -373,6 +403,15 @@ namespace vk
 		const auto input_h = static_cast<u32>(request.srcOffsets[1].y - request.srcOffsets[0].y);
 		const auto output_w = static_cast<u32>(request.dstOffsets[1].x - request.dstOffsets[0].x);
 		const auto output_h = static_cast<u32>(request.dstOffsets[1].y - request.dstOffsets[0].y);
+		
+		// Apply quality scale factor to determine optimal intermediate resolution
+		const float quality_scale = get_quality_scale_factor();
+		const auto effective_input_w = static_cast<u32>(output_w / quality_scale);
+		const auto effective_input_h = static_cast<u32>(output_h / quality_scale);
+		
+		// Log quality mode for debugging
+		const auto quality_mode = g_cfg.video.fsr3_quality.get();
+		rsx_log.notice("FSR3: Using quality mode %d with scale factor %.1fx", static_cast<int>(quality_mode), quality_scale);
 
 		// Initialize images if needed or if resolution changed
 		if (!m_output_left && !m_output_right)
@@ -413,12 +452,14 @@ namespace vk
 		if (m_frame_count > 0 && m_previous_color)
 		{
 			// Use temporal pass for improved quality on subsequent frames
-			m_temporal_pass->run(cmd, src, output_image, { input_w, input_h }, { output_w, output_h });
+			// Apply quality-based scaling for optimal performance/quality balance
+			m_temporal_pass->run(cmd, src, output_image, { effective_input_w, effective_input_h }, { output_w, output_h });
 		}
 		else
 		{
 			// Use spatial upscaling pass for first frame
-			m_upscale_pass->run(cmd, src, output_image, { input_w, input_h }, { output_w, output_h });
+			// Apply quality-based scaling for optimal performance/quality balance
+			m_upscale_pass->run(cmd, src, output_image, { effective_input_w, effective_input_h }, { output_w, output_h });
 		}
 
 		// Copy current output to previous frame buffer for temporal accumulation

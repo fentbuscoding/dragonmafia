@@ -71,6 +71,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Emu\RSX\VK\upscalers\fsr1\fsr_pass.cpp" />
+    <ClCompile Include="Emu\RSX\VK\upscalers\fsr3\fsr_pass.cpp" />
     <ClCompile Include="Emu\RSX\VK\VKAsyncScheduler.cpp" />
     <ClCompile Include="Emu\RSX\VK\VKCommandStream.cpp" />
     <ClCompile Include="Emu\RSX\VK\VKCommonDecompiler.cpp" />

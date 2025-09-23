@@ -1162,6 +1162,15 @@ QString emu_settings::GetLocalizedSetting(const QString& original, emu_settings_
 		case output_scaling_mode::fsr3: return tr("FidelityFX Super Resolution 3", "Output Scaling Mode");
 		}
 		break;
+	case emu_settings_type::FSR3QualityMode:
+		switch (static_cast<fsr3_quality_mode>(index))
+		{
+		case fsr3_quality_mode::quality: return tr("Quality", "FSR3 Quality Mode");
+		case fsr3_quality_mode::balanced: return tr("Balanced", "FSR3 Quality Mode");
+		case fsr3_quality_mode::performance: return tr("Performance", "FSR3 Quality Mode");
+		case fsr3_quality_mode::ultra_performance: return tr("Ultra Performance", "FSR3 Quality Mode");
+		}
+		break;
 	case emu_settings_type::AudioRenderer:
 		switch (static_cast<audio_renderer>(index))
 		{
