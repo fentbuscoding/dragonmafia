@@ -306,7 +306,7 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	// x18, x19...x30
 	// NOTE: Do not touch x19..x30 before saving the registers!
 	const u64 hv_register_array_offset = ::offset32(&ppu_thread::hv_ctx, &rpcs3::hypervisor_context_t::regs);
-	Label hv_ctx_pc = c.newLabel(); // Used to hold the far jump return address
+	Label hv_ctx_pc = c.new_label(); // Used to hold the far jump return address
 
 	// Sanity
 	ensure(hv_register_array_offset < 4096); // Imm10
@@ -445,8 +445,8 @@ const auto ppu_recompiler_fallback_ghc = build_function_asm<void(*)(ppu_thread& 
 {
 	using namespace asmjit;
 
-	Label fallback_fn = c.newLabel();
-	Label escape_fn = c.newLabel();
+	Label fallback_fn = c.new_label();
+	Label escape_fn = c.new_label();
 
 	// This is called as GHC so the first arg is in x20.
 	// Fix up the arg registers and call the real function.
@@ -1008,8 +1008,8 @@ struct ppu_far_jumps_t
 				c.mov(x86::dword_ptr(args[0], ::offset32(&ppu_thread::cia)), pc);
 				c.jmp(ppu_far_jump);
 #else
-				Label jmp_address = c.newLabel();
-				Label imm_address = c.newLabel();
+				Label jmp_address = c.new_label();
+				Label imm_address = c.new_label();
 
 				c.ldr(args[1].w(), arm::ptr(imm_address));
 				c.str(args[1].w(), arm::Mem(args[0], ::offset32(&ppu_thread::cia)));
@@ -3160,10 +3160,10 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label fail = c.newLabel();
-	Label _ret = c.newLabel();
-	Label load = c.newLabel();
+	Label fall = c.new_label();
+	Label fail = c.new_label();
+	Label _ret = c.new_label();
+	Label load = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{
@@ -3222,7 +3222,7 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	const auto stamp0 = x86::r14;
 	build_get_tsc(c, stamp0);
 
-	Label fail2 = c.newLabel();
+	Label fail2 = c.new_label();
 
 	Label tx1 = build_transaction_enter(c, fall, [&]()
 	{

@@ -389,7 +389,7 @@ DECLARE(spu_runtime::g_gateway) = build_function_asm<spu_function_t>("spu_gatewa
 	c.add(a64::x14, a64::x14, a64::x15); // Reg context offset
 
 	// Return address of escape should jump to the restore block
-	auto epilogue_addr = c.newLabel();
+	auto epilogue_addr = c.new_label();
 	c.adr(a64::x15, epilogue_addr);
 	c.mov(a64::x16, a64::sp);
 

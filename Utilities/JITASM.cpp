@@ -221,7 +221,7 @@ void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 {
 	ensure(!code->flatten());
 	ensure(!code->resolveUnresolvedLinks());
-	usz codeSize = code->codeSize();
+	usz codeSize = code->code_size();
 	if (!codeSize)
 		return nullptr;
 
@@ -403,7 +403,7 @@ asmjit::simd_builder::simd_builder(CodeHolder* ch) noexcept
 	: native_asm(ch)
 {
 	_init(0);
-	consts[~v128()] = this->newLabel();
+	consts[~v128()] = this->new_label();
 }
 
 asmjit::simd_builder::~simd_builder()
@@ -503,7 +503,7 @@ void asmjit::simd_builder::vec_set_const(const Operand& v, const v128& val)
 	{
 		Label co = consts[val];
 		if (!co.isValid())
-			co = consts[val] = this->newLabel();
+			co = consts[val] = this->new_label();
 		if (x86::Zmm zr(v.id()); zr == v)
 			this->vbroadcasti32x4(zr, x86::oword_ptr(co));
 		else if (x86::Ymm yr(v.id()); yr == v)
