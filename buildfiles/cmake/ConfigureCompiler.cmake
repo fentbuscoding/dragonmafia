@@ -48,8 +48,8 @@ else()
 		add_compile_options(-O3)           # Highest optimization level
 		add_compile_options(-funroll-loops) # Unroll loops for better performance
 		add_compile_options(-ftree-vectorize) # Enable auto-vectorization
-		add_compile_options(-ffast-math)   # Enable fast math for floating point operations
 		add_compile_options(-fomit-frame-pointer) # Remove frame pointer for better performance
+		# Note: -ffast-math removed due to compatibility issues with third-party libraries
 	endif()
 
 	if(USE_NATIVE_INSTRUCTIONS AND COMPILER_SUPPORTS_MARCH_NATIVE)
