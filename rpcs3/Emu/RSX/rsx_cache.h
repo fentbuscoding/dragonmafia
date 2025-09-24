@@ -23,9 +23,9 @@ namespace rsx
 	{
 		using unpacked_type = lf_fifo<std::tuple<pipeline_storage_type, RSXVertexProgram, RSXFragmentProgram>,
 #ifdef ANDROID
-		200
+		400  // Increased from 200 for better performance on Android
 #else
-		1000 // TODO: Determine best size
+		1500 // Increased from 1000 for better performance
 #endif
 		>;
 
