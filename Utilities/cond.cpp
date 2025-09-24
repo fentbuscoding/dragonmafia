@@ -26,6 +26,13 @@ void cond_variable::imp_wait(u32 _old, u64 _timeout) noexcept
 
 void cond_variable::imp_wake(u32 _count) noexcept
 {
+	// Fast path optimization: check if there are any waiters before doing atomic operations
+	const u32 current = m_value.load();
+	if (!current || (current & c_signal_mask) == c_signal_mask)
+	{
+		return;
+	}
+
 	const auto [_old, ok] = m_value.fetch_op([](u32& value)
 	{
 		if (!value || (value & c_signal_mask) == c_signal_mask)

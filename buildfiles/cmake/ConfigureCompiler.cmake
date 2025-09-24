@@ -7,6 +7,18 @@ if(MSVC)
 		NOMINMAX _ENABLE_EXTENDED_ALIGNED_STORAGE=1 _HAS_EXCEPTIONS=0)
 	add_link_options(/DYNAMICBASE)
 
+	# Performance optimizations for Release builds
+	if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
+		# Aggressive optimization flags for better FPS  
+		add_compile_options(/O2)         # Maximum optimization (favor speed)
+		add_compile_options(/Oi)         # Enable intrinsic functions
+		add_compile_options(/Ot)         # Favor fast code
+		add_compile_options(/Oy)         # Omit frame pointer
+		add_compile_options(/GL)         # Whole program optimization
+		add_compile_options(/arch:AVX2)  # Use AVX2 instructions if available
+		add_link_options(/LTCG)          # Link-time code generation
+	endif()
+
 	#TODO: Some of these could be cleaned up
 	add_compile_options(/wd4805) # Comparing boolean and int
 	add_compile_options(/wd4804) # Using integer operators with booleans
@@ -29,6 +41,16 @@ else()
 	add_compile_options(-Wall)
 	add_compile_options(-fno-exceptions)
 	add_compile_options(-fstack-protector)
+
+	# Performance optimizations for Release builds
+	if(CMAKE_BUILD_TYPE STREQUAL "Release")
+		# Aggressive optimization flags for better FPS
+		add_compile_options(-O3)           # Highest optimization level
+		add_compile_options(-funroll-loops) # Unroll loops for better performance
+		add_compile_options(-ftree-vectorize) # Enable auto-vectorization
+		add_compile_options(-ffast-math)   # Enable fast math for floating point operations
+		add_compile_options(-fomit-frame-pointer) # Remove frame pointer for better performance
+	endif()
 
 	if(USE_NATIVE_INSTRUCTIONS AND COMPILER_SUPPORTS_MARCH_NATIVE)
 		add_compile_options(-march=native)

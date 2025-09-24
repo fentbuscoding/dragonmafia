@@ -4252,8 +4252,10 @@ extern void ppu_precompile(std::vector<std::string>& dir_queue, std::vector<ppu_
 #ifdef __APPLE__
 		pthread_jit_write_protect_np(false);
 #endif
-		// Set low priority
-		thread_ctrl::scoped_priority low_prio(-1);
+		// Set priority optimized for FPS performance 
+		// Use normal priority instead of low priority for better responsiveness
+		// Only lower priority slightly to avoid blocking main thread completely
+		thread_ctrl::scoped_priority balanced_prio(0);  // Normal priority instead of -1
 		u32 inc_fdone = 1;
 		u32 restore_mem = 0;
 

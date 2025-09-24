@@ -140,6 +140,13 @@ namespace rsx
 				while (((pos = processed++) < stop_at) && !Emu.IsStopped())
 				{
 					auto& entry = unpacked[pos];
+					
+					// Prefetch next entry for better cache performance 
+					if (pos + 1 < unpacked.size())
+					{
+						__builtin_prefetch(&unpacked[pos + 1], 0, 3);
+					}
+					
 					m_storage.add_pipeline_entry(std::get<1>(entry), std::get<2>(entry), std::get<0>(entry), std::forward<Args>(args)...);
 				}
 				// Do not account for an extra shader that was never processed
