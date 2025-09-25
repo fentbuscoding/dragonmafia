@@ -43,8 +43,6 @@ inline thread_local asmjit::vec_builder* g_vc = nullptr;
 namespace asmjit
 {
 #if defined(ARCH_X64)
-	// Forward declare asmjit types to avoid dependency on specific headers
-	namespace x86 { class Gp; class Xmm; class Mem; }
 	using gpr_type = x86::Gp;
 	using vec_type = x86::Xmm;
 	using mem_type = x86::Mem;
