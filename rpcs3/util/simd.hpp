@@ -43,9 +43,9 @@ inline thread_local asmjit::vec_builder* g_vc = nullptr;
 namespace asmjit
 {
 #if defined(ARCH_X64)
-	using gpr_type = x86::Gp;
-	using vec_type = x86::Xmm;
-	using mem_type = x86::Mem;
+	using gpr_type = asmjit::x86::Gp;
+	using vec_type = asmjit::x86::Xmm;
+	using mem_type = asmjit::x86::Mem;
 #else
 	struct gpr_type : Operand
 	{
