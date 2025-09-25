@@ -15,6 +15,7 @@
 
 #include <immintrin.h>
 #include <emmintrin.h>
+#include <asmjit/x86.h>
 #endif
 
 #if defined(ARCH_ARM64)
@@ -44,7 +45,7 @@ namespace asmjit
 {
 #if defined(ARCH_X64)
 	using gpr_type = x86::Gp;
-	using vec_type = x86::XmmReg;
+	using vec_type = x86::Xmm;
 	using mem_type = x86::Mem;
 #else
 	struct gpr_type : Operand
@@ -159,9 +160,9 @@ namespace asmjit
 			{
 				for (auto& [key, _label] : consts[sz - 1])
 				{
-					base::align(AlignMode::kData, 1u << std::countr_zero<u32>(sz));
-					base::bind(_label);
-					base::embed(&key, sz);
+					this->align(AlignMode::kData, 1u << std::countr_zero<u32>(sz));
+					this->bind(_label);
+					this->embed(&key, sz);
 				}
 			}
 		}
@@ -197,7 +198,7 @@ namespace asmjit
 			auto& _label = consts[Size - 1][key];
 
 			if (!_label.is_valid())
-				_label = base::newLabel();
+				_label = this->newLabel();
 
 			return x86::Mem(_label, 0, Size);
 		}
@@ -913,7 +914,7 @@ inline v128 gv_shl32(const v128& a, u32 count)
 #if defined(ARCH_X64)
 	return _mm_slli_epi32(a, count);
 #elif defined(ARCH_ARM64)
-	return vshlq_s32(a, vdupq_n_s32(count));
+	return vshlq_u32(a, vdupq_n_s32(count));
 #endif
 }
 
@@ -2039,7 +2040,7 @@ inline v128 gv_hadds16x2(const v128& a, const v128& c)
 inline v128 gv_dotu8s8x4(const v128& a, const v128& b, const v128& c)
 {
 #if (defined(__AVX512VL__) && defined(__AVX512VNNI__)) || defined(__AVXVNNI__)
-	return _mm_dpbusd_epi32(c, a, b);
+	return _mm_dpbusds_epi32(c, a, b);
 #elif defined(ARCH_X64)
 	const __m128i ah = _mm_srli_epi16(a, 8);
 	const __m128i al = _mm_and_si128(a, _mm_set1_epi16(0x00ff));
@@ -2874,10 +2875,15 @@ inline v128 gv_shr8(const v128& a, const v128& b)
 #else
 	const v128 x1 = gv_and32(gv_shr64(a, 1), gv_bcst8(0x7f)); // shift right by 1
 	const v128 r1 = gv_signselect8(gv_shl64(b, 7), x1, a);
-	const v128 x2 = gv_and32(gv_shr64(r1, 2), gv_bcst8(0x3f)); // shift by 2
-	const v128 r2 = gv_signselect8(gv_shl64(b, 6), x2, r1);
-	const v128 x3 = gv_and32(gv_shr64(r2, 4), gv_bcst8(0x0f)); // shift by 4
-	return gv_signselect8(gv_shl64(b, 5), x3, r2);
+	const v128 b1 = gv_signselect8(std::move(s1), gv_shl64(b, 1), std::forward<B>(b));
+	auto c2 = gv_bcst8(0x3);
+	const v128 x2 = gv_and32(gv_shr64(b1, 6), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
+	const v128 s2 = gv_shl64(c, 6);
+	const v128 r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
+	const v128 a2 = gv_signselect8(std::move(s2), gv_shr64(a, 1), std::move(a));
+	auto c3 = gv_bcst8(0xf);
+	const v128 x3 = gv_and32(gv_shr64(r2, 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(a2, 4)));
+	return gv_signselect8(gv_shl64(c, 5), x3, r2);
 #endif
 }
 
@@ -2954,321 +2960,544 @@ inline v128 gv_sar32(const v128& a, const v128& b)
 #endif
 }
 
-// For each 8-bit element, r = rotate a by b
-inline v128 gv_rol8(const v128& a, const v128& b)
+inline v128 gv_add8(const v128& a, const v128& b)
 {
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(b, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(amt1, gv_bcst8(8));
-	return vorrq_u8(vshlq_u8(a, amt1), vshlq_u8(a, amt2));
-#else
-	const v128 x1 = gv_sub8(gv_add8(a, a), gv_gts8(gv_bcst8(0), a)); // rotate left by 1
-	const v128 r1 = gv_signselect8(gv_shl64(b, 7), x1, a);
-	const v128 c2 = gv_bcst8(0x3);
-	const v128 x2 = gv_or32(gv_and32(gv_shr64(r1, 6), c2), gv_andn32(c2, gv_shl64(r1, 2))); // rotate by 2
-	const v128 r2 = gv_signselect8(gv_shl64(b, 6), x2, r1);
-	const v128 c3 = gv_bcst8(0xf);
-	const v128 x3 = gv_or32(gv_and32(gv_shr64(r2, 4), c3), gv_andn32(c3, gv_shl64(r2, 4))); // rotate by 4
-	return gv_signselect8(gv_shl64(b, 5), x3, r2);
-#endif
-}
-
-// For each 16-bit element, r = rotate a by b
-inline v128 gv_rol16(const v128& a, const v128& b)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s16(b, gv_bcst16(15));
-	const auto amt2 = vsubq_s16(amt1, gv_bcst16(16));
-	return vorrq_u16(vshlq_u16(a, amt1), vshlq_u16(a, amt2));
-#else
-	v128 r;
-	for (u32 i = 0; i < 8; i++)
-		r._u16[i] = utils::rol16(a._u16[i], b._u16[i]);
-	return r;
-#endif
-}
-
-// For each 16-bit element, r = rotate a by count
-template <u8 Count>
-inline v128 gv_rol16(const v128& a)
-{
-	constexpr u8 count = Count & 0xf;
 #if defined(ARCH_X64)
-	return _mm_or_si128(_mm_srli_epi16(a, 16 - count), _mm_slli_epi16(a, count));
+	return _mm_add_epi8(a, b);
 #elif defined(ARCH_ARM64)
-	return vorrq_u16(vshrq_n_u16(a, 16 - count), vshlq_n_u16(a, count));
-#else
-	v128 r;
-	for (u32 i = 0; i < 8; i++)
-		r._u16[i] = std::rotl(a._u16[i], count);
-	return r;
+	return vaddq_s8(a, b);
 #endif
 }
 
-// For each 32-bit element, r = rotate a by b
-inline v128 gv_rol32(const v128& a, const v128& b)
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_add8(A&& a, B&& b)
 {
-#if defined(__AVX512VL__)
-	return _mm_rolv_epi32(a, b);
+	FOR_X64(binary_op, 1, kIdMovdqa, kIdPaddb, kIdVpaddb, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_add16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_add_epi16(a, b);
 #elif defined(ARCH_ARM64)
-	const auto amt1 = vandq_s32(b, gv_bcst32(31));
-	const auto amt2 = vsubq_s32(amt1, gv_bcst32(32));
-	return vorrq_u32(vshlq_u32(a, amt1), vshlq_u32(a, amt2));
-#else
-	v128 r;
-	for (u32 i = 0; i < 4; i++)
-		r._u32[i] = utils::rol32(a._u32[i], b._u32[i]);
-	return r;
+	return vaddq_s16(a, b);
 #endif
 }
 
-// For each 32-bit element, r = rotate a by count
-template <u8 Count>
-inline v128 gv_rol32(const v128& a)
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_add16(A&& a, B&& b)
 {
-	constexpr u8 count = Count & 0x1f;
-#if defined(__AVX512VL__)
-	return _mm_rol_epi32(a, count);
+	FOR_X64(binary_op, 2, kIdMovdqa, kIdPaddw, kIdVpaddw, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_add32(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_add_epi32(a, b);
+#elif defined(ARCH_ARM64)
+	return vaddq_s32(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_add32(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 4, kIdMovdqa, kIdPaddd, kIdVpaddd, kIdVpaddd, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_add64(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_add_epi64(a, b);
+#elif defined(ARCH_ARM64)
+	return vaddq_s64(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_add64(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 8, kIdMovdqa, kIdPaddq, kIdVpaddq, kIdVpaddq, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_adds_s8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_adds_epi8(a, b);
+#elif defined(ARCH_ARM64)
+	return vqaddq_s8(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_adds_s8(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 1, kIdMovdqa, kIdPaddsb, kIdVpaddsb, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_adds_s16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_adds_epi16(a, b);
+#elif defined(ARCH_ARM64)
+	return vqaddq_s16(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_adds_s16(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 2, kIdMovdqa, kIdPaddsw, kIdVpaddsw, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_adds_s32(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	const v128 s = _mm_add_epi32(a, b);
+	const v128 m = (a ^ s) & (b ^ s); // overflow bit
+	const v128 x = _mm_srai_epi32(m, 31); // saturation mask
+	const v128 y = _mm_srai_epi32(_mm_and_si128(s, m), 31); // positive saturation mask
+	return _mm_xor_si128(_mm_xor_si128(_mm_srli_epi32(x, 1), y), _mm_or_si128(s, x));
+#elif defined(ARCH_ARM64)
+	return vqaddq_s32(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_adds_s32(A&& a, B&& b)
+{
+#if defined(ARCH_X64)
+	auto s = gv_add32(a, b);
+	auto m = gv_and32(gv_xor32(std::forward<A>(a), s), gv_xor32(std::forward<B>(b), s));
+	auto x = gv_sar32(m, 31);
+	auto y = gv_sar32(gv_and32(s, std::move(m)), 31);
+	auto z = gv_xor32(gv_shr32(x, 1), std::move(y));
+	return gv_xor32(std::move(z), gv_or32(std::move(s), std::move(x)));
+#endif
+}
+
+inline v128 gv_addus_u8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_adds_epu8(a, b);
+#elif defined(ARCH_ARM64)
+	return vqaddq_u8(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_addus_u8(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 1, kIdMovdqa, kIdPaddusb, kIdVpaddusb, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_addus_u16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_adds_epu16(a, b);
+#elif defined(ARCH_ARM64)
+	return vqaddq_u16(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_addus_u16(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 2, kIdMovdqa, kIdPaddusw, kIdVpaddusw, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_addus_u32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_add_epi32(a, _mm_min_epu32(~a, b));
 #elif defined(ARCH_X64)
-	return _mm_or_si128(_mm_srli_epi32(a, 32 - count), _mm_slli_epi32(a, count));
+	const v128 s = _mm_add_epi32(a, b);
+	return _mm_or_si128(s, _mm_cmpgt_epi32(_mm_xor_si128(b, _mm_set1_epi32(smin)), _mm_xor_si128(a, _mm_set1_epi32(smax))));
 #elif defined(ARCH_ARM64)
-	return vorrq_u32(vshrq_n_u32(a, 32 - count), vshlq_n_u32(a, count));
-#else
-	v128 r;
-	for (u32 i = 0; i < 4; i++)
-		r._u32[i] = utils::rol32(a._u32[i], count);
-	return r;
+	return vqaddq_u32(a, b);
 #endif
 }
 
-// For each 8-bit element, r = (a << (c & 7)) | (b >> (~c & 7) >> 1)
-template <typename A, typename B, typename C>
-inline auto gv_fshl8(A&& a, B&& b, C&& c)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(c, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(amt1, gv_bcst8(8));
-	return v128(vorrq_u8(vshlq_u8(a, amt1), vshlq_u8(b, amt2)));
-#else
-	auto x1 = gv_sub8(gv_add8(a, a), gv_gts8(gv_bcst8(0), b));
-	auto s1 = gv_shl64(c, 7);
-	auto r1 = gv_signselect8(s1, std::move(x1), std::forward<A>(a));
-	auto b1 = gv_signselect8(std::move(s1), gv_shl64(b, 1), std::forward<B>(b));
-	auto c2 = gv_bcst8(0x3);
-	auto x2 = gv_and32(gv_shr64(b1, 6), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
-	auto s2 = gv_shl64(c, 6);
-	auto r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
-	auto b2 = gv_signselect8(std::move(s2), gv_shl64(b1, 2), std::move(b1));
-	auto c3 = gv_bcst8(0xf);
-	auto x3 = gv_and32(gv_shr64(std::move(b2), 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(r2, 4)));
-	return gv_signselect8(gv_shl64(std::move(c), 5), std::move(x3), std::move(r2));
-#endif
-}
-
-// For each 8-bit element, r = (b >> (c & 7)) | (a << (~c & 7) << 1)
-template <typename A, typename B, typename C>
-inline auto gv_fshr8(A&& a, B&& b, C&& c)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(c, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(gv_bcst8(8), amt1);
-	return vorrq_u8(vshlq_u8(b, vnegq_s8(amt1)), vshlq_u8(a, amt2));
-#else
-	auto c1 = gv_bcst8(0x7f);
-	auto x1 = gv_and32(gv_shr64(b, 1), c1); x1 = gv_or32(std::move(x1), gv_andn32(std::move(c1), gv_shl64(a, 7)));
-	auto s1 = gv_shl64(c, 7);
-	auto r1 = gv_signselect8(s1, std::move(x1), std::move(b));
-	auto a1 = gv_signselect8(std::move(s1), gv_shr64(a, 1), std::move(a));
-	auto c2 = gv_bcst8(0x3f);
-	auto x2 = gv_and32(gv_shr64(r1, 2), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(a1, 6)));
-	auto s2 = gv_shl64(c, 6);
-	auto r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
-	auto a2 = gv_signselect8(std::move(s2), gv_shr64(a1, 2), std::move(a1));
-	auto c3 = gv_bcst8(0x0f);
-	auto x3 = gv_and32(gv_shr64(r2, 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(std::move(a2), 4)));
-	return gv_signselect8(gv_shl64(std::move(c), 5), std::move(x3), std::move(r2));
-#endif
-}
-
-// Shift left by byte amount
-template <u32 Count>
-inline v128 gv_shuffle_left(const v128& a)
-{
-	if (Count > 15)
-		return {};
-#if defined(ARCH_X64)
-	return _mm_slli_si128(a, Count);
-#elif defined(ARCH_ARM64)
-	v128 idx;
-	for (u32 i = 0; i < 16; i++)
-		idx._u8[i] = u8(i - Count);
-	return vqtbl1q_u8(a, idx);
-#endif
-}
-
-template <u32 Count, typename A> requires (asmjit::any_operand_v<A>)
-inline auto gv_shuffle_left(A&& a)
-{
-	FOR_X64(unary_op, kIdPslldq, kIdVpslldq, std::forward<A>(a), Count);
-}
-
-// Shift right by byte amount
-template <u32 Count>
-inline v128 gv_shuffle_right(const v128& a)
-{
-	if (Count > 15)
-		return {};
-#if defined(ARCH_X64)
-	return _mm_srli_si128(a, Count);
-#elif defined(ARCH_ARM64)
-	v128 idx;
-	for (u32 i = 0; i < 16; i++)
-		idx._u8[i] = u8(i + Count);
-	return vqtbl1q_u8(a, idx);
-#endif
-}
-
-template <u32 Count, typename A> requires (asmjit::any_operand_v<A>)
-inline auto gv_shuffle_right(A&& a)
-{
-	FOR_X64(unary_op, kIdPsrldq, kIdVpsrldq, std::forward<A>(a), Count);
-}
-
-// Load 32-bit integer into the first element of a new vector, set other elements to zero
-inline v128 gv_loadu32(const void* ptr)
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline asmjit::vec_type gv_addus_u32(A&& a, B&& b)
 {
 #if defined(ARCH_X64)
-	return _mm_loadu_si32(ptr);
-#elif defined(ARCH_ARM64)
-	return vld1q_lane_u32(static_cast<const u32*>(ptr), vdupq_n_u32(0), 0);
+	if (utils::has_sse41())
+		return gv_add32(gv_minu32(std::forward<B>(b), gv_not32(a)), std::forward<A>(a));
+	auto s = gv_add32(a, b);
+	auto x = gv_xor32(std::forward<B>(b), gv_bcst32(0x80000000));
+	auto y = gv_xor32(std::forward<A>(a), gv_bcst32(0x7fffffff));
+	return gv_or32(std::move(s), gv_gts32(std::move(x), std::move(y)));
 #endif
+	return {};
 }
 
-// Load 16-bit integer into an existing vector at the position specified by Index
-template <u8 Index>
-inline v128 gv_insert16(const v128& vec, u16 value)
+inline v128 gv_addfs(const v128& a, const v128& b)
 {
 #if defined(ARCH_X64)
-	return _mm_insert_epi16(vec, value, Index);
+	return _mm_add_ps(a, b);
 #elif defined(ARCH_ARM64)
-	return vsetq_lane_u16(value, vec, Index & 0x7);
+	return vaddq_f32(a, b);
 #endif
 }
 
-// For each 8-bit element,
-// if ctrl >= 0 && ctrl < 16 then r = vec[ctrl],
-// else if ctrl < 0 then r = 0
-inline v128 gv_shuffle8(const v128& vec, const v128& ctrl)
-{
-	AUDIT(std::ranges::none_of(ctrl._chars, [](s8 i){ return i >= static_cast<s8>(sizeof(v128)); }), "All indices must be in the range [0, 15] or negative, since PSHUFB and TBL behave differently otherwise");
-#if defined(__SSSE3__)
-	return _mm_shuffle_epi8(vec, ctrl);
-#elif defined(ARCH_ARM64)
-	return vqtbl1q_s8(vec, ctrl);
-#else
-	v128 r;
-	for (s32 i = 0; i < 16; i++)
-		r._s8[i] = ctrl._s8[i] < 0 ? 0 : vec._s8[ctrl._s8[i] & 0xf];
-	return r;
-#endif
-}
-
-// For each 2-bit index in Control, r = vec[index]
-template <u8 Control>
-inline v128 gv_shuffle32(const v128& vec)
+inline v128 gv_addfd(const v128& a, const v128& b)
 {
 #if defined(ARCH_X64)
-	return _mm_shuffle_epi32(vec, Control);
+	return _mm_add_pd(a, b);
 #elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Control & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Control >> 2 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Control >> 4 & 3) * sizeof(s32);
-	constexpr u8 idx3 = (Control >> 6 & 3) * sizeof(s32);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl1q_s8(vec, idx_vec);
+	return vaddq_f64(a, b);
 #endif
 }
 
-// For each index, r = vec[index & 3]
-template <u8 Index0, u8 Index1, u8 Index2, u8 Index3>
-inline v128 gv_shuffle32(const v128& vec)
+inline v128 gv_sub8(const v128& a, const v128& b)
 {
 #if defined(ARCH_X64)
-	return _mm_shuffle_epi32(vec, (Index0 & 3) | (Index1 & 3) << 2 | (Index2 & 3) << 4 | (Index3 & 3) << 6);
+	return _mm_sub_epi8(a, b);
 #elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Index0 & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Index1 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Index2 & 3) * sizeof(s32);
-	constexpr u8 idx3 = (Index3 & 3) * sizeof(s32);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl1q_s8(vec, idx_vec);
+	return vsubq_s8(a, b);
 #endif
 }
 
-// For the first two 2-bit indices in Control, r = a[index],
-// for the last two indices, r = b[index]
-template <u8 Control>
-inline v128 gv_shufflefs(const v128& a, const v128& b)
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline auto gv_sub8(A&& a, B&& b)
+{
+	FOR_X64(binary_op, 1, kIdMovdqa, kIdPsubb, kIdVpsubb, kIdNone, std::forward<A>(a), std::forward<B>(b));
+}
+
+inline v128 gv_sub16(const v128& a, const v128& b)
 {
 #if defined(ARCH_X64)
-	return _mm_shuffle_ps(a, b, Control);
+	return _mm_sub_epi16(a, b);
 #elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Control & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Control >> 2 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Control >> 4 & 3) * sizeof(s32) + sizeof(v128);
-	constexpr u8 idx3 = (Control >> 6 & 3) * sizeof(s32) + sizeof(v128);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl2q_s8({ a, b }, idx_vec);
+	return vsubq_s16(a, b);
 #endif
 }
 
-// For the first two indices, r = a[index & 3],
-// for the last two indices, r = b[index & 3]
-template <u8 Index0, u8 Index1, u8 Index2, u8 Index3>
-inline v128 gv_shufflefs(const v128& a, const v128& b)
+inline v128 gv_sub32(const v128& a, const v128& b)
 {
 #if defined(ARCH_X64)
-	return _mm_shuffle_ps(a, b, (Index0 & 3) | (Index1 & 3) << 2 | (Index2 & 3) << 4 | (Index3 & 3) << 6);
+	return _mm_sub_epi32(a, b);
 #elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Index0 & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Index1 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Index2 & 3) * sizeof(s32) + sizeof(v128);
-	constexpr u8 idx3 = (Index3 & 3) * sizeof(s32) + sizeof(v128);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl2q_s8({ a, b }, idx_vec);
+	return vsubq_s32(a, b);
 #endif
 }
 
-// For each 32-bit element, reverse byte order
-inline v128 gv_rev32(const v128& vec)
+inline v128 gv_sub64(const v128& a, const v128& b)
 {
-#if defined(__SSSE3__)
-	return _mm_shuffle_epi8(vec, _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12));
+#if defined(ARCH_X64)
+	return _mm_sub_epi64(a, b);
 #elif defined(ARCH_ARM64)
-	return vrev32q_u8(vec);
-#else
-	return gv_rol32<16>(gv_rol16<8>(vec));
+	return vsubq_s64(a, b);
 #endif
 }
 
-// For each 32-bit element, convert between big-endian and native-endian
-inline v128 gv_to_be32(const v128& vec)
+inline v128 gv_subs_s8(const v128& a, const v128& b)
 {
-	if constexpr (std::endian::native == std::endian::little)
-		return gv_rev32(vec);
-	return vec;
+#if defined(ARCH_X64)
+	return _mm_subs_epi8(a, b);
+#elif defined(ARCH_ARM64)
+	return vqsubq_s8(a, b);
+#endif
 }
 
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
+inline v128 gv_subs_s16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_subs_epi16(a, b);
+#elif defined(ARCH_ARM64)
+	return vqsubq_s16(a, b);
 #endif
+}
+
+inline v128 gv_subs_s32(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	const v128 d = _mm_sub_epi32(a, b);
+	const v128 m = (a ^ b) & (a ^ d); // overflow bit
+	const v128 x = _mm_srai_epi32(m, 31);
+	return _mm_or_si128(_mm_andnot_si128(x, d), _mm_and_si128(x, _mm_xor_si128(_mm_srli_epi32(x, 1), _mm_srai_epi32(a, 31))));
+#elif defined(ARCH_ARM64)
+	return vqsubq_s32(a, b);
+#endif
+}
+
+inline v128 gv_subus_u8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_subs_epu8(a, b);
+#elif defined(ARCH_ARM64)
+	return vqsubq_u8(a, b);
+#endif
+}
+
+inline v128 gv_subus_u16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_subs_epu16(a, b);
+#elif defined(ARCH_ARM64)
+	return vqsubq_u16(a, b);
+#endif
+}
+
+inline v128 gv_subus_u32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_sub_epi32(a, _mm_min_epu32(a, b));
+#elif defined(ARCH_X64)
+	const auto sign = _mm_set1_epi32(smin);
+	return _mm_andnot_si128(_mm_cmpgt_epi32(_mm_xor_si128(b, sign), _mm_xor_si128(a, sign)), _mm_sub_epi32(a, b));
+#elif defined(ARCH_ARM64)
+	return vqsubq_u32(a, b);
+#endif
+}
+
+inline v128 gv_subfs(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_sub_ps(a, b);
+#elif defined(ARCH_ARM64)
+	return vsubq_f32(a, b);
+#endif
+}
+
+inline v128 gv_subfd(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_sub_pd(a, b);
+#elif defined(ARCH_ARM64)
+	return vsubq_f64(a, b);
+#endif
+}
+
+inline v128 gv_maxu8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_max_epu8(a, b);
+#elif defined(ARCH_ARM64)
+	return vmaxq_u8(a, b);
+#endif
+}
+
+inline v128 gv_maxu16(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_max_epu16(a, b);
+#elif defined(ARCH_X64)
+	return _mm_add_epi16(_mm_subs_epu16(a, b), b);
+#elif defined(ARCH_ARM64)
+	return vmaxq_u16(a, b);
+#endif
+}
+
+inline v128 gv_maxu32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_max_epu32(a, b);
+#elif defined(ARCH_X64)
+	const __m128i s = _mm_set1_epi32(smin);
+	const __m128i m = _mm_cmpgt_epi32(_mm_xor_si128(a, s), _mm_xor_si128(b, s));
+	return _mm_or_si128(_mm_and_si128(m, a), _mm_andnot_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vmaxq_u32(a, b);
+#endif
+}
+
+inline v128 gv_maxs8(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_max_epi8(a, b);
+#elif defined(ARCH_X64)
+	const __m128i m = _mm_cmpgt_epi8(a, b);
+	return _mm_or_si128(_mm_and_si128(m, a), _mm_andnot_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vmaxq_s8(a, b);
+#endif
+}
+
+inline v128 gv_maxs16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_max_epi16(a, b);
+#elif defined(ARCH_ARM64)
+	return vmaxq_s16(a, b);
+#endif
+}
+
+inline v128 gv_maxs32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_max_epi32(a, b);
+#elif defined(ARCH_X64)
+	const __m128i m = _mm_cmpgt_epi32(a, b);
+	return _mm_or_si128(_mm_and_si128(m, a), _mm_andnot_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vmaxq_s32(a, b);
+#endif
+}
+
+inline v128 gv_maxfs(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_and_ps(_mm_max_ps(a, b), _mm_max_ps(b, a));
+#elif defined(ARCH_ARM64)
+	return vmaxq_f32(a, b);
+#endif
+}
+
+inline v128 gv_minu8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_min_epu8(a, b);
+#elif defined(ARCH_ARM64)
+	return vminq_u8(a, b);
+#endif
+}
+
+inline v128 gv_minu16(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_min_epu16(a, b);
+#elif defined(ARCH_X64)
+	return _mm_sub_epi16(a, _mm_subs_epu16(a, b));
+#elif defined(ARCH_ARM64)
+	return vminq_u16(a, b);
+#endif
+}
+
+inline v128 gv_minu32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_min_epu32(a, b);
+#elif defined(ARCH_X64)
+	const __m128i s = _mm_set1_epi32(smin);
+	const __m128i m = _mm_cmpgt_epi32(_mm_xor_si128(a, s), _mm_xor_si128(b, s));
+	return _mm_or_si128(_mm_andnot_si128(m, a), _mm_and_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vminq_u32(a, b);
+#endif
+}
+
+template <typename A, typename B> requires (asmjit::any_operand_v<A, B>)
+inline asmjit::vec_type gv_minu32(A&& a, B&& b)
+{
+#if defined(ARCH_X64)
+	if (utils::has_sse41())
+		FOR_X64(binary_op, 4, kIdMovdqa, kIdPminud, kIdVpminud, kIdVpminud, std::forward<A>(a), std::forward<B>(b));
+	auto s = gv_bcst32(0x80000000);
+	auto x = gv_xor32(a, s);
+	auto m = gv_gts32(std::move(x), gv_xor32(std::move(s), b));
+	auto z = gv_and32(m, std::move(b));
+	return gv_or32(std::move(z), gv_andn32(std::move(m), std::move(a)));
+#endif
+	return {};
+}
+
+inline v128 gv_mins8(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_min_epi8(a, b);
+#elif defined(ARCH_X64)
+	const __m128i m = _mm_cmpgt_epi8(a, b);
+	return _mm_or_si128(_mm_andnot_si128(m, a), _mm_and_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vminq_s8(a, b);
+#endif
+}
+
+inline v128 gv_mins16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_min_epi16(a, b);
+#elif defined(ARCH_ARM64)
+	return vminq_s16(a, b);
+#endif
+}
+
+inline v128 gv_mins32(const v128& a, const v128& b)
+{
+#if defined(__SSE4_1__)
+	return _mm_min_epi32(a, b);
+#elif defined(ARCH_X64)
+	const __m128i m = _mm_cmpgt_epi32(a, b);
+	return _mm_or_si128(_mm_andnot_si128(m, a), _mm_and_si128(m, b));
+#elif defined(ARCH_ARM64)
+	return vminq_s32(a, b);
+#endif
+}
+
+inline v128 gv_minfs(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_or_ps(_mm_min_ps(a, b), _mm_min_ps(b, a));
+#elif defined(ARCH_ARM64)
+	return vminq_f32(a, b);
+#endif
+}
+
+inline v128 gv_eq8(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_cmpeq_epi8(a, b);
+#elif defined(ARCH_ARM64)
+	return vceqq_s8(a, b);
+#endif
+}
+
+inline v128 gv_eq16(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_cmpeq_epi16(a, b);
+#elif defined(ARCH_ARM64)
+	return vceqq_s16(a, b);
+#endif
+}
+
+inline v128 gv_eq32(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_cmpeq_epi32(a, b);
+#elif defined(ARCH_ARM64)
+	return vceqq_s32(a, b);
+#endif
+}
+
+// Ordered and equal
+inline v128 gv_eqfs(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_cmpeq_ps(a, b);
+#elif defined(ARCH_ARM64)
+	return vceqq_f32(a, b);
+#endif
+}
+
+// Unordered or not equal
+inline v128 gv_neqfs(const v128& a, const v128& b)
+{
+#if defined(ARCH_X64)
+	return _mm_cmpneq_ps(a, b);
+#elif defined(ARCH_ARM64)
+	return ~vceqq_f32(a, b);
+#endif
+}
+
+inline v128 gv_gtu8(const v128& a, const v128& b)
+{
+#if defined(__AVX512VL__) && defined(__AVX512BW__)
+	return _mm_movm_epi8(_mm_cmpgt_epu8_mask(a, b));
+#elif defined(ARCH_X64)
+	return _mm_cmpeq_epi8(_mm_cmpeq_epi8(a, _mm_min_epu8(a, b)), _mm_setzero_si128());
+#elif defined(ARCH_ARM64)
+	return vcgtq_u8(a, b);
+#endif
+}
+
+inline v128 gv_gtu16(const v128& a, const v128& b)
+{
+#if defined(__AVX512VL__) && defined(__AVX512BW__)
+	return _mm_movm_epi16(_mm_cmpgt_epu16_mask(a, b));
+#elif defined(__SSE4_1__)
+	return _mm_cmpeq_epi16(_mm_cmpeq_epi16(a, _mm_min_epu16(a, b)), _mm_setzero_si128());
+#elif defined(ARCH_X64)
+	return _mm_cmpeq_epi16(_mm_cmpeq_epi16(_mm_subs_epu16(a, b), _mm_setzero_si128()), _mm_set
