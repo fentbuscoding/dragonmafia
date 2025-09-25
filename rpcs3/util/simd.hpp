@@ -44,7 +44,7 @@ namespace asmjit
 {
 #if defined(ARCH_X64)
 	using gpr_type = x86::Gp;
-	using vec_type = x86::Xmm;
+	using vec_type = x86::XmmReg;
 	using mem_type = x86::Mem;
 #else
 	struct gpr_type : Operand
@@ -183,20 +183,20 @@ namespace asmjit
 			if (Size == 16 && esize == 4 && key._u64[0] == key._u64[1] && key._u32[0] == key._u32[1])
 			{
 				x86::Mem r = get_const<u32>(key._u32[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To4);
+				r.set_broadcast(x86::Mem::Broadcast::k1To4);
 				return r;
 			}
 
 			if (Size == 16 && esize == 8 && key._u64[0] == key._u64[1])
 			{
 				x86::Mem r = get_const<u64>(key._u64[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To2);
+				r.set_broadcast(x86::Mem::Broadcast::k1To2);
 				return r;
 			}
 
 			auto& _label = consts[Size - 1][key];
 
-			if (!_label.isValid())
+			if (!_label.is_valid())
 				_label = base::newLabel();
 
 			return x86::Mem(_label, 0, Size);

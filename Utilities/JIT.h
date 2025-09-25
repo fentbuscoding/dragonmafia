@@ -30,7 +30,7 @@
 #pragma GCC diagnostic ignored "-Wduplicated-branches"
 #pragma GCC diagnostic ignored "-Wdeprecated-enum-enum-conversion"
 #endif
-#include <asmjit/asmjit.h>
+#include <asmjit/x86.h>
 #if defined(ARCH_ARM64)
 #include <asmjit/a64.h>
 #endif
