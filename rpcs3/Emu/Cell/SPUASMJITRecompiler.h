@@ -71,6 +71,11 @@ private:
 
 		XmmLink(XmmLink&&) = default; // MoveConstructible + delete copy constructor and copy/move operators
 
+		operator const asmjit::x86::Vec&() const
+		{
+			return *m_var;
+		}
+
 		operator const asmjit::x86::Xmm&() const
 		{
 			return *m_var;

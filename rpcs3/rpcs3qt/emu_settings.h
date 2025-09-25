@@ -42,6 +42,9 @@ public:
 	/** Connects a combo box with the target settings type*/
 	void EnhanceComboBox(QComboBox* combobox, emu_settings_type type, bool is_ranged = false, bool use_max = false, int max = 0, bool sorted = false, bool strict = true);
 
+	/** Populates output scaling mode combo box excluding FSR3 if not using Vulkan */
+	void PopulateOutputScalingMode(QComboBox* combobox, bool is_vulkan);
+
 	/** Connects a check box with the target settings type*/
 	void EnhanceCheckBox(QCheckBox* checkbox, emu_settings_type type);
 

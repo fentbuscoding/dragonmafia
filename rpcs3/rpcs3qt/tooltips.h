@@ -204,6 +204,7 @@ public:
 
 		const QString output_scaling_mode = tr("Final image filtering. Nearest applies no filtering, Bilinear smooths the image, and FidelityFX Super Resolution enhances upscaled images.\nIf the game is rendering at an internal resolution lower than your window resolution, FidelityFX will handle the upscale.\nFidelityFX can cause visual artifacts.\nFidelityFX does not work with stereo 3D output for now.");
 		const QString fsr_rcas_strength   = tr("Control the sharpening strength applied by FidelityFX Super Resolution. Higher values will give sharper output but may introduce artifacts.");
+		const QString fsr3_quality_mode   = tr("Select the quality mode for FidelityFX Super Resolution 3.\nQuality: Best visual quality with lower performance (1.5x upscaling).\nBalanced: Good balance between quality and performance (1.7x upscaling).\nPerformance: Better performance with slightly reduced quality (2.0x upscaling).\nUltra Performance: Best performance with most reduced quality (3.0x upscaling).");
 
 		const QString texture_lod_bias = tr("Changes Texture sampling accuracy. (Small changes have a big effect.)\nAvoid using values outside the range of -12 to +12 if you're unsure.\n-3 to +3 is plenty for most usecases");
 

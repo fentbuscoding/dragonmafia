@@ -694,6 +694,24 @@ void fmt_class_string<output_scaling_mode>::format(std::string& out, u64 arg)
 		case output_scaling_mode::nearest: return "Nearest";
 		case output_scaling_mode::bilinear: return "Bilinear";
 		case output_scaling_mode::fsr: return "FidelityFX Super Resolution";
+		case output_scaling_mode::fsr3: return "FidelityFX Super Resolution 3.0";
+		}
+
+		return unknown;
+	});
+}
+
+template <>
+void fmt_class_string<fsr3_quality_mode>::format(std::string& out, u64 arg)
+{
+	format_enum(out, arg, [](fsr3_quality_mode value)
+	{
+		switch (value)
+		{
+		case fsr3_quality_mode::quality: return "Quality";
+		case fsr3_quality_mode::balanced: return "Balanced";
+		case fsr3_quality_mode::performance: return "Performance";
+		case fsr3_quality_mode::ultra_performance: return "Ultra Performance";
 		}
 
 		return unknown;

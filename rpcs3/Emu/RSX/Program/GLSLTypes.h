@@ -20,7 +20,7 @@ namespace glsl
 
 	struct shader_properties
 	{
-		glsl::program_domain domain : 3;
+		glsl::program_domain domain : 8;
 
 		// Applicable in vertex stage
 		bool require_lit_emulation : 1;

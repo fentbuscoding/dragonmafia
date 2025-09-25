@@ -328,7 +328,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 					c->dq(cmask);
 				});
 
-				c->setExtraReg(x86::k7);
+				c->set_extra_reg(x86::k7);
 				c->z().vmovdqa32(x86::zmm0, x86::zmmword_ptr(*qw1, j - ls_off));
 			}
 			else
@@ -4732,14 +4732,14 @@ void spu_recompiler::SHUFB(spu_opcode_t op)
 		const XmmLink& vm = XmmAlloc();
 		c->vpcmpub(asmjit::x86::k1, vc, XmmConst(v128::from8p(-0x40)), 5 /* GE */);
 		c->vpxor(vm, vc, XmmConst(v128::from8p(0xf)));
-		c->setExtraReg(asmjit::x86::k1);
+		c->set_extra_reg(asmjit::x86::k1);
 		c->z().vpblendmb(vc, vc, XmmConst(v128::from8p(-1))); // {k1}
 		c->vpcmpub(asmjit::x86::k2, vm, XmmConst(v128::from8p(-0x20)), 5 /* GE */);
 		c->vptestmb(asmjit::x86::k1, vm, XmmConst(v128::from8p(0x10)));
 		c->vpshufb(vt, va, vm);
-		c->setExtraReg(asmjit::x86::k2);
+		c->set_extra_reg(asmjit::x86::k2);
 		c->z().vpblendmb(va, va, XmmConst(v128::from8p(0x7f))); // {k2}
-		c->setExtraReg(asmjit::x86::k1);
+		c->set_extra_reg(asmjit::x86::k1);
 		c->vpshufb(vt, vb, vm); // {k1}
 		c->vpternlogd(vt, va, vc, 0xf6 /* orAxorBC */);
 		c->movdqa(SPU_OFF_128(gpr, op.rt4), vt);

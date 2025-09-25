@@ -74,7 +74,7 @@ static constexpr spu_opcode_t s_op{};
 namespace asmjit
 {
 	template <uint I, uint N>
-	static void build_spu_gpr_load(x86::Assembler& c, x86::Xmm x, const bf_t<u32, I, N>&, bool store = false)
+	static void build_spu_gpr_load(x86::Assembler& c, x86::Vec x, const bf_t<u32, I, N>&, bool store = false)
 	{
 		static_assert(N == 7, "Invalid bitfield");
 
@@ -118,7 +118,7 @@ namespace asmjit
 	}
 
 	template <uint I, uint N>
-	static void build_spu_gpr_store(x86::Assembler& c, x86::Xmm x, const bf_t<u32, I, N>&, bool store = true)
+	static void build_spu_gpr_store(x86::Assembler& c, x86::Vec x, const bf_t<u32, I, N>&, bool store = true)
 	{
 		build_spu_gpr_load(c, x, bf_t<u32, I, N>{}, store);
 	}
@@ -2000,9 +2000,9 @@ const spu_intrp_func_t optimized_shufb = build_function_asm<spu_intrp_func_t>("s
 	const auto& vm = x86::xmm4;
 	const auto& v5 = x86::xmm5;
 
-	Label xc0 = c.newLabel();
-	Label xe0 = c.newLabel();
-	Label x0f = c.newLabel();
+	Label xc0 = c.new_label();
+	Label xe0 = c.new_label();
+	Label x0f = c.new_label();
 
 	build_spu_gpr_load(c, va, s_op.ra);
 	build_spu_gpr_load(c, vb, s_op.rb);

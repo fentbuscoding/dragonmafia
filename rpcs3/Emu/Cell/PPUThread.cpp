@@ -306,7 +306,7 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	// x18, x19...x30
 	// NOTE: Do not touch x19..x30 before saving the registers!
 	const u64 hv_register_array_offset = ::offset32(&ppu_thread::hv_ctx, &rpcs3::hypervisor_context_t::regs);
-	Label hv_ctx_pc = c.newLabel(); // Used to hold the far jump return address
+	Label hv_ctx_pc = c.new_label(); // Used to hold the far jump return address
 
 	// Sanity
 	ensure(hv_register_array_offset < 4096); // Imm10
@@ -317,52 +317,52 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	c.adr(a64::x15, hv_ctx_pc); // x15 = pc
 	c.mov(a64::x13, a64::sp);   // x16 = sp
 
-	c.stp(a64::x15, a64::x13, arm::Mem(a64::x14));
-	c.stp(a64::x18, a64::x19, arm::Mem(a64::x14, 16));
-	c.stp(a64::x20, a64::x21, arm::Mem(a64::x14, 32));
-	c.stp(a64::x22, a64::x23, arm::Mem(a64::x14, 48));
-	c.stp(a64::x24, a64::x25, arm::Mem(a64::x14, 64));
-	c.stp(a64::x26, a64::x27, arm::Mem(a64::x14, 80));
-	c.stp(a64::x28, a64::x29, arm::Mem(a64::x14, 96));
-	c.str(a64::x30, arm::Mem(a64::x14, 112));
+	c.stp(a64::x15, a64::x13, a64::Mem(a64::x14));
+	c.stp(a64::x18, a64::x19, a64::Mem(a64::x14, 16));
+	c.stp(a64::x20, a64::x21, a64::Mem(a64::x14, 32));
+	c.stp(a64::x22, a64::x23, a64::Mem(a64::x14, 48));
+	c.stp(a64::x24, a64::x25, a64::Mem(a64::x14, 64));
+	c.stp(a64::x26, a64::x27, a64::Mem(a64::x14, 80));
+	c.stp(a64::x28, a64::x29, a64::Mem(a64::x14, 96));
+	c.str(a64::x30, a64::Mem(a64::x14, 112));
 
 	// Load REG_Base - use absolute jump target to bypass rel jmp range limits
 	c.mov(a64::x19, Imm(reinterpret_cast<u64>(&vm::g_exec_addr)));
-	c.ldr(a64::x19, arm::Mem(a64::x19));
+	c.ldr(a64::x19, a64::Mem(a64::x19));
 	// Load PPUThread struct base -> REG_Sp
-	const arm::GpX ppu_t_base = a64::x20;
+	const a64::GpX ppu_t_base = a64::x20;
 	c.mov(ppu_t_base, args[0]);
 	// Load PC
-	const arm::GpX pc = a64::x15;
-	const arm::GpX cia_addr_reg = a64::x11;
+	const a64::GpX pc = a64::x15;
+	const a64::GpX cia_addr_reg = a64::x11;
 	// Load offset value
 	c.mov(cia_addr_reg, Imm(static_cast<u64>(::offset32(&ppu_thread::cia))));
 	// Load cia
-	c.ldr(pc.w(), arm::Mem(ppu_t_base, cia_addr_reg));
+	c.ldr(pc.w(), a64::Mem(ppu_t_base, cia_addr_reg));
 
 	// Multiply by 2 to index into ptr table
 	c.add(pc, pc, pc);
 
 	// Load call target
-	const arm::GpX call_target = a64::x13;
-	c.ldr(call_target, arm::Mem(a64::x19, pc));
+	const a64::GpX call_target = a64::x13;
+	c.ldr(call_target, a64::Mem(a64::x19, pc));
 	// Compute REG_Hp
-	const arm::GpX reg_hp = a64::x21;
+	const a64::GpX reg_hp = a64::x21;
 	c.mov(reg_hp, Imm(vm::g_exec_addr_seg_offset));
-	c.add(reg_hp, reg_hp, pc, arm::Shift(arm::ShiftOp::kLSR, 2));
-	c.ldrh(reg_hp.w(), arm::Mem(a64::x19, reg_hp));
+	c.add(reg_hp, reg_hp, pc, a64::Shift(a64::ShiftOp::kLSR, 2));
+	c.ldrh(reg_hp.w(), a64::Mem(a64::x19, reg_hp));
 	c.lsl(reg_hp.w(), reg_hp.w(), 13);
 
 	// Load registers
 	c.mov(a64::x22, Imm(reinterpret_cast<u64>(&vm::g_base_addr)));
-	c.ldr(a64::x22, arm::Mem(a64::x22));
+	c.ldr(a64::x22, a64::Mem(a64::x22));
 
-	const arm::GpX gpr_addr_reg = a64::x9;
+	const a64::GpX gpr_addr_reg = a64::x9;
 	c.mov(gpr_addr_reg, Imm(static_cast<u64>(::offset32(&ppu_thread::gpr))));
 	c.add(gpr_addr_reg, gpr_addr_reg, ppu_t_base);
-	c.ldr(a64::x23, arm::Mem(gpr_addr_reg));
-	c.ldr(a64::x24, arm::Mem(gpr_addr_reg, 8));
-	c.ldr(a64::x25, arm::Mem(gpr_addr_reg, 16));
+	c.ldr(a64::x23, a64::Mem(gpr_addr_reg));
+	c.ldr(a64::x24, a64::Mem(gpr_addr_reg, 8));
+	c.ldr(a64::x25, a64::Mem(gpr_addr_reg, 16));
 
 	// Thread context save. This is needed for PPU because different functions can switch between x19 and x20 for the base register.
 	// We need a different solution to ensure that no matter which version, we get the right vaue on far return.
@@ -370,7 +370,7 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 
 	// Save thread pointer to stack. SP is the only register preserved across GHC calls.
 	c.sub(a64::sp, a64::sp, Imm(16));
-	c.str(a64::x20, arm::Mem(a64::sp));
+	c.str(a64::x20, a64::Mem(a64::sp));
 
 	// GHC scratchpad mem. If managed correctly (i.e no returns ever), GHC functions should never require a stack frame.
 	// We allocate a slab to use for all functions as they tail-call into each other.
@@ -385,21 +385,21 @@ const auto ppu_gateway = build_function_asm<void(*)(ppu_thread*)>("ppu_gateway",
 	// Clear scratchpad allocation
 	c.add(a64::sp, a64::sp, Imm(8192));
 
-	c.ldr(a64::x20, arm::Mem(a64::sp));
+	c.ldr(a64::x20, a64::Mem(a64::sp));
 	c.add(a64::sp, a64::sp, Imm(16));
 
 	// We either got here through normal "ret" which keeps our x20 intact, or we jumped here and the escape reset our x20 reg
 	// Either way, x26 contains our thread base and we forcefully reset the stack pointer
 	c.add(a64::x14, a64::x20, Imm(hv_register_array_offset));  // Per-thread context save
 
-	c.ldr(a64::x15, arm::Mem(a64::x14, 8));
-	c.ldp(a64::x18, a64::x19, arm::Mem(a64::x14, 16));
-	c.ldp(a64::x20, a64::x21, arm::Mem(a64::x14, 32));
-	c.ldp(a64::x22, a64::x23, arm::Mem(a64::x14, 48));
-	c.ldp(a64::x24, a64::x25, arm::Mem(a64::x14, 64));
-	c.ldp(a64::x26, a64::x27, arm::Mem(a64::x14, 80));
-	c.ldp(a64::x28, a64::x29, arm::Mem(a64::x14, 96));
-	c.ldr(a64::x30, arm::Mem(a64::x14, 112));
+	c.ldr(a64::x15, a64::Mem(a64::x14, 8));
+	c.ldp(a64::x18, a64::x19, a64::Mem(a64::x14, 16));
+	c.ldp(a64::x20, a64::x21, a64::Mem(a64::x14, 32));
+	c.ldp(a64::x22, a64::x23, a64::Mem(a64::x14, 48));
+	c.ldp(a64::x24, a64::x25, a64::Mem(a64::x14, 64));
+	c.ldp(a64::x26, a64::x27, a64::Mem(a64::x14, 80));
+	c.ldp(a64::x28, a64::x29, a64::Mem(a64::x14, 96));
+	c.ldr(a64::x30, a64::Mem(a64::x14, 112));
 
 	// Return
 	c.mov(a64::sp, a64::x15);
@@ -421,11 +421,11 @@ const extern auto ppu_escape = build_function_asm<void(*)(ppu_thread*)>("ppu_esc
 #else
 	// We really shouldn't be using this, but an implementation shoudln't hurt
 	// Far jump return. Only clobbers x30.
-	const arm::GpX ppu_t_base = a64::x20;
+	const a64::GpX ppu_t_base = a64::x20;
 	const u64 hv_register_array_offset = ::offset32(&ppu_thread::hv_ctx, &rpcs3::hypervisor_context_t::regs);
 	c.mov(ppu_t_base, args[0]);
 	c.mov(a64::x30, Imm(hv_register_array_offset));
-	c.ldr(a64::x30, arm::Mem(ppu_t_base, a64::x30));
+	c.ldr(a64::x30, a64::Mem(ppu_t_base, a64::x30));
 	c.ret(a64::x30);
 #endif
 });
@@ -445,24 +445,24 @@ const auto ppu_recompiler_fallback_ghc = build_function_asm<void(*)(ppu_thread& 
 {
 	using namespace asmjit;
 
-	Label fallback_fn = c.newLabel();
-	Label escape_fn = c.newLabel();
+	Label fallback_fn = c.new_label();
+	Label escape_fn = c.new_label();
 
 	// This is called as GHC so the first arg is in x20.
 	// Fix up the arg registers and call the real function.
 	c.mov(args[0], a64::x20);
-	c.ldr(a64::x13, arm::ptr(fallback_fn));
+	c.ldr(a64::x13, a64::ptr(fallback_fn));
 	c.blr(a64::x13);
 
 	// There is no call-stack to return to in arm64 GHC. Escape to host.
 	c.mov(a64::x0, a64::x20);
-	c.ldr(a64::x13, arm::ptr(escape_fn));
+	c.ldr(a64::x13, a64::ptr(escape_fn));
 	c.br(a64::x13);
 
 	c.bind(fallback_fn);
-	c.embedUInt64(reinterpret_cast<u64>(ppu_recompiler_fallback));
+	c.embed_uint64(reinterpret_cast<u64>(ppu_recompiler_fallback));
 	c.bind(escape_fn);
-	c.embedUInt64(reinterpret_cast<u64>(ppu_escape));
+	c.embed_uint64(reinterpret_cast<u64>(ppu_escape));
 });
 #endif
 
@@ -1045,19 +1045,19 @@ struct ppu_far_jumps_t
 				c.mov(x86::dword_ptr(args[0], ::offset32(&ppu_thread::cia)), pc);
 				c.jmp(ppu_far_jump);
 #else
-				Label jmp_address = c.newLabel();
-				Label imm_address = c.newLabel();
+				Label jmp_address = c.new_label();
+				Label imm_address = c.new_label();
 
-				c.ldr(args[1].w(), arm::ptr(imm_address));
-				c.str(args[1].w(), arm::Mem(args[0], ::offset32(&ppu_thread::cia)));
-				c.ldr(args[1], arm::ptr(jmp_address));
+				c.ldr(args[1].w(), a64::ptr(imm_address));
+				c.str(args[1].w(), a64::Mem(args[0], ::offset32(&ppu_thread::cia)));
+				c.ldr(args[1], a64::ptr(jmp_address));
 				c.br(args[1]);
 
 				c.align(AlignMode::kCode, 16);
 				c.bind(jmp_address);
-				c.embedUInt64(reinterpret_cast<u64>(ppu_far_jump));
+				c.embed_uint64(reinterpret_cast<u64>(ppu_far_jump));
 				c.bind(imm_address);
-				c.embedUInt32(pc);
+				c.embed_uint32(pc);
 #endif
 			}, &rt);
 		}
@@ -3197,10 +3197,10 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	using namespace asmjit;
 
 #if defined(ARCH_X64)
-	Label fall = c.newLabel();
-	Label fail = c.newLabel();
-	Label _ret = c.newLabel();
-	Label load = c.newLabel();
+	Label fall = c.new_label();
+	Label fail = c.new_label();
+	Label _ret = c.new_label();
+	Label load = c.new_label();
 
 	//if (utils::has_avx() && !s_tsx_avx)
 	//{
@@ -3259,7 +3259,7 @@ const auto ppu_stcx_accurate_tx = build_function_asm<u64(*)(u32 raddr, u64 rtime
 	const auto stamp0 = x86::r14;
 	build_get_tsc(c, stamp0);
 
-	Label fail2 = c.newLabel();
+	Label fail2 = c.new_label();
 
 	Label tx1 = build_transaction_enter(c, fall, [&]()
 	{
@@ -5124,14 +5124,12 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 		auto func = build_function_asm<u8*(*)(ppu_thread&, u64, u8*, u64, u64, u64)>(name, [&](native_asm& c, auto& /*args*/)
 		{
 #if defined(ARCH_X64)
-			c.mov(x86::edx, func_addr - seg0); // Load PC
+		c.mov(x86::edx, func_addr - seg0); // Load PC
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());
 
-			code_size_until_jump = buf_end - buf_start;
-
-			c.add(x86::edx, seg0);
+		code_size_until_jump = buf_end - buf_start;			c.add(x86::edx, seg0);
 			c.movabs(x86::rax, reinterpret_cast<u64>(&vm::g_exec_addr));
 			c.mov(x86::rax, x86::qword_ptr(x86::rax));
 			c.mov(x86::dword_ptr(x86::rbp, ::offset32(&ppu_thread::cia)), x86::edx);
@@ -5146,42 +5144,38 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			c.jmp(x86::rcx);
 #else
 			// Load REG_Base - use absolute jump target to bypass rel jmp range limits
-			// X19 contains vm::g_exec_addr
-			const arm::GpX exec_addr = a64::x19;
+		// X19 contains vm::g_exec_addr
+		const a64::GpX exec_addr = a64::x19;
 
-			// X20 contains ppu_thread*
-			const arm::GpX ppu_t_base = a64::x20;
+		// X20 contains ppu_thread*
+		const a64::GpX ppu_t_base = a64::x20;
 
-			// Load PC
-			const arm::GpX pc = a64::x15;
-			const arm::GpX cia_addr_reg = a64::x11;
+		// Load PC
+		const a64::GpX pc = a64::x15;
+		const a64::GpX cia_addr_reg = a64::x11;		// Load CIA
+		c.mov(pc.w(), func_addr);
 
-			// Load CIA
-			c.mov(pc.w(), func_addr);
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
-
-			code_size_until_jump = buf_end - buf_start;
-
-			// Load offset value
+		code_size_until_jump = buf_end - buf_start;			// Load offset value
 			c.mov(cia_addr_reg, static_cast<u64>(::offset32(&ppu_thread::cia)));
 
 			// Update CIA
-			c.str(pc.w(), arm::Mem(ppu_t_base, cia_addr_reg));
+			c.str(pc.w(), a64::Mem(ppu_t_base, cia_addr_reg));
 
 			// Multiply by 2 to index into ptr table
 			c.add(pc, pc, pc);
 
 			// Load call target
-			const arm::GpX call_target = a64::x13;
-			c.ldr(call_target, arm::Mem(exec_addr, pc));
+			const a64::GpX call_target = a64::x13;
+			c.ldr(call_target, a64::Mem(exec_addr, pc));
 
 			// Compute REG_Hp
-			const arm::GpX reg_hp = a64::x21;
+			const a64::GpX reg_hp = a64::x21;
 			c.mov(reg_hp, Imm(vm::g_exec_addr_seg_offset));
-			c.add(reg_hp, reg_hp, pc, arm::Shift(arm::ShiftOp::kLSR, 2));
-			c.ldrh(reg_hp.w(), arm::Mem(exec_addr, reg_hp));
+			c.add(reg_hp, reg_hp, pc, a64::Shift(a64::ShiftOp::kLSR, 2));
+			c.ldrh(reg_hp.w(), a64::Mem(exec_addr, reg_hp));
 			c.lsl(reg_hp.w(), reg_hp.w(), 13);
 
 			// Execute LLE call

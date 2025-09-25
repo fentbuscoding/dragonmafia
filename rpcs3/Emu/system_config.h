@@ -182,6 +182,7 @@ struct cfg_root : cfg::node
 		cfg::_bool disable_msl_fast_math{ this, "Disable MSL Fast Math", false };
 		cfg::_bool disable_async_host_memory_manager{ this, "Disable Asynchronous Memory Manager", false, true };
 		cfg::_enum<output_scaling_mode> output_scaling{ this, "Output Scaling Mode", output_scaling_mode::bilinear, true };
+		cfg::_enum<fsr3_quality_mode> fsr3_quality{ this, "FSR3 Quality Mode", fsr3_quality_mode::balanced, true };
 
 		struct node_vk : cfg::node
 		{

@@ -2369,7 +2369,7 @@ thread_base::native_entry thread_base::make_trampoline(u64(*entry)(thread_base* 
 		using namespace asmjit;
 
 #if defined(ARCH_X64)
-		Label _ret = c.newLabel();
+		Label _ret = c.new_label();
 		c.push(x86::rbp);
 		c.sub(x86::rsp, 0x20);
 

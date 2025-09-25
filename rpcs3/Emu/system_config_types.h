@@ -343,7 +343,16 @@ enum class output_scaling_mode
 {
 	nearest,
 	bilinear,
-	fsr
+	fsr,
+	fsr3
+};
+
+enum class fsr3_quality_mode
+{
+	quality,
+	balanced,
+	performance,
+	ultra_performance
 };
 
 enum class stereo_render_mode_options

@@ -294,7 +294,7 @@ struct ppu_abstract_t
 		{
 			const asmjit::Operand& eval(bool is_lv)
 			{
-				if (is_lv && !this->isReg())
+				if (is_lv && !this->is_reg())
 				{
 					Operand::operator=(g_vc->vec_alloc());
 				#if defined(ARCH_X64)
@@ -304,9 +304,13 @@ struct ppu_abstract_t
 
 				if (!is_lv)
 				{
-					if (this->isReg())
+					if (this->is_reg())
 					{
-						g_vc->vec_dealloc(asmjit::vec_type{this->id()});
+				#if defined(ARCH_X64)
+						g_vc->vec_dealloc(asmjit::x86::Vec::make_v128(this->id()));
+				#else
+						g_vc->vec_dealloc(asmjit::vec_type(this->id()));
+				#endif
 					}
 					else
 					{

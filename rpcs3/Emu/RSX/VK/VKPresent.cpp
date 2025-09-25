@@ -7,6 +7,7 @@
 
 #include "upscalers/bilinear_pass.hpp"
 #include "upscalers/fsr_pass.h"
+#include "upscalers/fsr3_pass.h"
 #include "upscalers/nearest_pass.hpp"
 #include "util/asm.hpp"
 #include "util/video_provider.h"
@@ -607,6 +608,10 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 		{
 			m_upscaler = std::make_unique<vk::fsr_upscale_pass>();
 		}
+		else if (m_output_scaling == output_scaling_mode::fsr3)
+		{
+			m_upscaler = std::make_unique<vk::fsr3_upscale_pass>();
+		}
 		else
 		{
 			m_upscaler = std::make_unique<vk::bilinear_upscale_pass>();
@@ -622,7 +627,7 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 			if (image_to_flip) calibration_src.push_back(image_to_flip);
 			if (image_to_flip2) calibration_src.push_back(image_to_flip2);
 
-			if (m_output_scaling == output_scaling_mode::fsr && !avconfig.stereo_enabled) // 3D will be implemented later
+			if ((m_output_scaling == output_scaling_mode::fsr || m_output_scaling == output_scaling_mode::fsr3) && !avconfig.stereo_enabled) // 3D will be implemented later
 			{
 				// Run upscaling pass before the rest of the output effects pipeline
 				// This can be done with all upscalers but we already get bilinear upscaling for free if we just out the filters directly
