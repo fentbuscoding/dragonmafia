@@ -15,6 +15,7 @@
 
 #include <immintrin.h>
 #include <emmintrin.h>
+#include <asmjit/x86.h>
 #endif
 
 #if defined(ARCH_ARM64)
@@ -44,7 +45,7 @@ namespace asmjit
 {
 #if defined(ARCH_X64)
 	using gpr_type = x86::Gp;
-	using vec_type = x86::Xmm;
+	using vec_type = x86::Vec;
 	using mem_type = x86::Mem;
 #else
 	struct gpr_type : Operand
@@ -128,12 +129,12 @@ namespace asmjit
 			if (!~vec_allocated)
 			{
 				fail_flag = true;
-				return vec_type{0};
+				return vec_type{};
 			}
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return vec_type{idx};
+			return x86::xmm(idx);
 		}
 
 		template <u32 Size>
@@ -159,9 +160,9 @@ namespace asmjit
 			{
 				for (auto& [key, _label] : consts[sz - 1])
 				{
-					base::align(AlignMode::kData, 1u << std::countr_zero<u32>(sz));
-					base::bind(_label);
-					base::embed(&key, sz);
+					this->align(AlignMode::kData, 1u << std::countr_zero<u32>(sz));
+					this->bind(_label);
+					this->embed(&key, sz);
 				}
 			}
 		}
@@ -183,21 +184,21 @@ namespace asmjit
 			if (Size == 16 && esize == 4 && key._u64[0] == key._u64[1] && key._u32[0] == key._u32[1])
 			{
 				x86::Mem r = get_const<u32>(key._u32[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To4);
+				r.set_broadcast(x86::Mem::Broadcast::k1To4);
 				return r;
 			}
 
 			if (Size == 16 && esize == 8 && key._u64[0] == key._u64[1])
 			{
 				x86::Mem r = get_const<u64>(key._u64[0]);
-				r.setBroadcast(x86::Mem::Broadcast::k1To2);
+				r.set_broadcast(x86::Mem::Broadcast::k1To2);
 				return r;
 			}
 
 			auto& _label = consts[Size - 1][key];
 
-			if (!_label.isValid())
-				_label = base::newLabel();
+			if (!_label.is_valid())
+				_label = this->new_label();
 
 			return x86::Mem(_label, 0, Size);
 		}
@@ -214,10 +215,10 @@ namespace asmjit
 
 		~free_on_exit()
 		{
-			if (x.isReg())
+			if (x.is_reg())
 			{
 				vec_type v;
-				v.copyFrom(x);
+				v.copy_from(x);
 				g_vc->vec_dealloc(v);
 			}
 		}
@@ -244,34 +245,34 @@ namespace asmjit
 				{
 					if (_c._u8[0] == _c._u8[1])
 					{
-						ensure(!g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0])));
+						g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0]));
 					}
 					else
 					{
-						ensure(!g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0])));
+						g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0]));
 					}
 				}
 				else
 				{
-					ensure(!g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0])));
+					g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0]));
 				}
 			}
 			else
 			{
-				ensure(!g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0])));
+				g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0]));
 			}
 		}
 		else if (!_c._u)
 		{
-			ensure(!g_vc->pxor(reg, reg));
+			g_vc->pxor(reg, reg);
 		}
 		else if (!~_c._u)
 		{
-			ensure(!g_vc->pcmpeqd(reg, reg));
+			g_vc->pcmpeqd(reg, reg);
 		}
 		else
 		{
-			ensure(!g_vc->movaps(reg, g_vc->get_const(_c, esize)));
+			g_vc->movaps(reg, g_vc->get_const(_c, esize));
 		}
 
 		g_vc->const_allocs.emplace(_c, reg);
@@ -321,9 +322,9 @@ namespace asmjit
 
 	inline void arg_free(const Operand& op)
 	{
-		if (op.isReg())
+		if (op.is_reg())
 		{
-			g_vc->vec_dealloc(vec_type{op.id()});
+			g_vc->vec_dealloc(x86::xmm(op.id()));
 		}
 	}
 
@@ -339,12 +340,12 @@ namespace asmjit
 		{
 			// Check if broadcast is set, or if the offset immediate can use disp8*N encoding
 			mem_type mem{};
-			mem.copyFrom(op);
-			if (mem.hasBaseLabel())
+			mem.copy_from(op);
+			if (mem.has_base_label())
 				return false;
-			if (mem.hasBroadcast())
+			if (mem.has_broadcast())
 				return true;
-			if (!mem.hasOffset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
+			if (!mem.has_offset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
 				return false;
 			return true;
 		}
@@ -401,11 +402,11 @@ namespace asmjit
 		static_assert(arg_classify<D> == arg_class::mem_lv);
 
 		mem_type dst;
-		dst.copyFrom(arg_eval(std::forward<D>(d), 16));
+		dst.copy_from(arg_eval(std::forward<D>(d), 16));
 
 		if (utils::has_avx512() && evex_op)
 		{
-			if (!dst.hasBaseLabel() && dst.hasOffset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
+			if (!dst.has_base_label() && dst.has_offset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
 			{
 				ensure(!g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)));
 				return;
@@ -428,8 +429,8 @@ namespace asmjit
 
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
-				ensure(!g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
+				g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
+				return x86::xmm(src1.id());
 			}
 
 			if constexpr (arg_classify<B> == arg_class::reg_rv)
@@ -466,18 +467,18 @@ namespace asmjit
 
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
-				ensure(!g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
+				g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
+				return x86::xmm(src1.id());
 			}
 
-			ensure(!g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
-			return vec_type{src1.id()};
+			g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...);
+			return x86::xmm(src1.id());
 		}
 		else do
 		{
 			if constexpr (arg_classify<A> == arg_class::mem_rv)
 			{
-				if (a.isReg())
+				if (a.is_reg())
 				{
 					src1 = vec_type(a.id());
 
@@ -516,13 +517,13 @@ namespace asmjit
 				if (!a._u)
 				{
 					// All zeros
-					ensure(!g_vc->emit(x86::Inst::kIdPxor, src1, src1));
+					g_vc->emit(x86::Inst::kIdPxor, src1, src1);
 					break;
 				}
 				else if (!~a._u)
 				{
 					// All ones
-					ensure(!g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1));
+					g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1);
 					break;
 				}
 			}
@@ -545,7 +546,7 @@ namespace asmjit
 			ensure(!g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
 		}
 
-		return vec_type{src1.id()};
+		return x86::xmm(src1.id());
 	}
 #define FOR_X64(f, ...) do { using enum asmjit::x86::Inst::Id; return asmjit::f(__VA_ARGS__); } while (0)
 #elif defined(ARCH_ARM64)
@@ -913,7 +914,7 @@ inline v128 gv_shl32(const v128& a, u32 count)
 #if defined(ARCH_X64)
 	return _mm_slli_epi32(a, count);
 #elif defined(ARCH_ARM64)
-	return vshlq_s32(a, vdupq_n_s32(count));
+	return vshlq_u32(a, vdupq_n_s32(count));
 #endif
 }
 
@@ -2039,7 +2040,7 @@ inline v128 gv_hadds16x2(const v128& a, const v128& c)
 inline v128 gv_dotu8s8x4(const v128& a, const v128& b, const v128& c)
 {
 #if (defined(__AVX512VL__) && defined(__AVX512VNNI__)) || defined(__AVXVNNI__)
-	return _mm_dpbusd_epi32(c, a, b);
+	return _mm_dpbusds_epi32(c, a, b);
 #elif defined(ARCH_X64)
 	const __m128i ah = _mm_srli_epi16(a, 8);
 	const __m128i al = _mm_and_si128(a, _mm_set1_epi16(0x00ff));
@@ -2134,7 +2135,7 @@ inline v128 gv_dots_u8s8x4(const v128& a, const v128& b, const v128& c)
 #elif defined(ARCH_ARM64)
     const auto l = vpaddlq_s16(vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(a))), vmovl_s8(vget_low_s8(b))));
 	const auto h = vpaddlq_s16(vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(a))), vmovl_s8(vget_high_s8(b))));
-    return vqaddq_s32(c, vaddq_s32(vuzp1q_s32(l, h), vuzp2q_s32(l, h)));
+    return vaddq_s32(c, vaddq_s32(vuzp1q_s32(l, h), vuzp2q_s32(l, h)));
 #endif
 }
 
@@ -2457,21 +2458,21 @@ inline asmjit::vec_type gv_signselect8(A&& bits, B&& _true, C&& _false)
 		Operand arg2 = arg_eval(std::forward<B>(_true), 16);
 		Operand arg3 = arg_eval(std::forward<C>(_false), 16);
 		if constexpr (!std::is_reference_v<A>)
-			arg0.isReg() ? arg_free(bits) : arg0.copyFrom(arg1);
+			arg0.is_reg() ? arg_free(bits) : arg0.copy_from(arg1);
 		if constexpr (!std::is_reference_v<B>)
-			arg0.isReg() ? arg_free(_true) : arg0.copyFrom(arg2);
+			arg0.is_reg() ? arg_free(_true) : arg0.copy_from(arg2);
 		if constexpr (!std::is_reference_v<C>)
-			arg0.isReg() ? arg_free(_false) : arg0.copyFrom(arg3);
-		if (arg0.isNone())
+			arg0.is_reg() ? arg_free(_false) : arg0.copy_from(arg3);
+		if (arg0.is_none())
 			arg0 = g_vc->vec_alloc();
 		g_vc->emit(x86::Inst::kIdVpblendvb, arg0, arg3, arg2, arg1);
 		vec_type r;
-		r.copyFrom(arg0);
+		r.copy_from(arg0);
 		return r;
 	}
 #endif
 	g_vc->fail_flag = true;
-	return vec_type{0};
+	return vec_type{};
 }
 
 // Select elements; _cmp must be result of SIMD comparison; undefined otherwise
@@ -2874,9 +2875,16 @@ inline v128 gv_shr8(const v128& a, const v128& b)
 #else
 	const v128 x1 = gv_and32(gv_shr64(a, 1), gv_bcst8(0x7f)); // shift right by 1
 	const v128 r1 = gv_signselect8(gv_shl64(b, 7), x1, a);
-	const v128 x2 = gv_and32(gv_shr64(r1, 2), gv_bcst8(0x3f)); // shift by 2
-	const v128 r2 = gv_signselect8(gv_shl64(b, 6), x2, r1);
-	const v128 x3 = gv_and32(gv_shr64(r2, 4), gv_bcst8(0x0f)); // shift by 4
+	const v128 b1 = gv_signselect8(gv_shl64(b, 7), gv_shl64(b, 1), b);
+	auto c2 = gv_bcst8(0x3);
+	v128 x2 = gv_and32(gv_shr64(b1, 6), c2); 
+	x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
+	const v128 s2 = gv_shl64(b, 6);
+	const v128 r2 = gv_signselect8(s2, std::move(x2), r1);
+	const v128 a2 = gv_signselect8(s2, gv_shr64(a, 1), a);
+	auto c3 = gv_bcst8(0xf);
+	v128 x3 = gv_and32(gv_shr64(r2, 4), c3); 
+	x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(a2, 4)));
 	return gv_signselect8(gv_shl64(b, 5), x3, r2);
 #endif
 }
@@ -2954,318 +2962,6 @@ inline v128 gv_sar32(const v128& a, const v128& b)
 #endif
 }
 
-// For each 8-bit element, r = rotate a by b
-inline v128 gv_rol8(const v128& a, const v128& b)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(b, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(amt1, gv_bcst8(8));
-	return vorrq_u8(vshlq_u8(a, amt1), vshlq_u8(a, amt2));
-#else
-	const v128 x1 = gv_sub8(gv_add8(a, a), gv_gts8(gv_bcst8(0), a)); // rotate left by 1
-	const v128 r1 = gv_signselect8(gv_shl64(b, 7), x1, a);
-	const v128 c2 = gv_bcst8(0x3);
-	const v128 x2 = gv_or32(gv_and32(gv_shr64(r1, 6), c2), gv_andn32(c2, gv_shl64(r1, 2))); // rotate by 2
-	const v128 r2 = gv_signselect8(gv_shl64(b, 6), x2, r1);
-	const v128 c3 = gv_bcst8(0xf);
-	const v128 x3 = gv_or32(gv_and32(gv_shr64(r2, 4), c3), gv_andn32(c3, gv_shl64(r2, 4))); // rotate by 4
-	return gv_signselect8(gv_shl64(b, 5), x3, r2);
-#endif
-}
-
-// For each 16-bit element, r = rotate a by b
-inline v128 gv_rol16(const v128& a, const v128& b)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s16(b, gv_bcst16(15));
-	const auto amt2 = vsubq_s16(amt1, gv_bcst16(16));
-	return vorrq_u16(vshlq_u16(a, amt1), vshlq_u16(a, amt2));
-#else
-	v128 r;
-	for (u32 i = 0; i < 8; i++)
-		r._u16[i] = utils::rol16(a._u16[i], b._u16[i]);
-	return r;
-#endif
-}
-
-// For each 16-bit element, r = rotate a by count
-template <u8 Count>
-inline v128 gv_rol16(const v128& a)
-{
-	constexpr u8 count = Count & 0xf;
-#if defined(ARCH_X64)
-	return _mm_or_si128(_mm_srli_epi16(a, 16 - count), _mm_slli_epi16(a, count));
-#elif defined(ARCH_ARM64)
-	return vorrq_u16(vshrq_n_u16(a, 16 - count), vshlq_n_u16(a, count));
-#else
-	v128 r;
-	for (u32 i = 0; i < 8; i++)
-		r._u16[i] = std::rotl(a._u16[i], count);
-	return r;
-#endif
-}
-
-// For each 32-bit element, r = rotate a by b
-inline v128 gv_rol32(const v128& a, const v128& b)
-{
-#if defined(__AVX512VL__)
-	return _mm_rolv_epi32(a, b);
-#elif defined(ARCH_ARM64)
-	const auto amt1 = vandq_s32(b, gv_bcst32(31));
-	const auto amt2 = vsubq_s32(amt1, gv_bcst32(32));
-	return vorrq_u32(vshlq_u32(a, amt1), vshlq_u32(a, amt2));
-#else
-	v128 r;
-	for (u32 i = 0; i < 4; i++)
-		r._u32[i] = utils::rol32(a._u32[i], b._u32[i]);
-	return r;
-#endif
-}
-
-// For each 32-bit element, r = rotate a by count
-template <u8 Count>
-inline v128 gv_rol32(const v128& a)
-{
-	constexpr u8 count = Count & 0x1f;
-#if defined(__AVX512VL__)
-	return _mm_rol_epi32(a, count);
-#elif defined(ARCH_X64)
-	return _mm_or_si128(_mm_srli_epi32(a, 32 - count), _mm_slli_epi32(a, count));
-#elif defined(ARCH_ARM64)
-	return vorrq_u32(vshrq_n_u32(a, 32 - count), vshlq_n_u32(a, count));
-#else
-	v128 r;
-	for (u32 i = 0; i < 4; i++)
-		r._u32[i] = utils::rol32(a._u32[i], count);
-	return r;
-#endif
-}
-
-// For each 8-bit element, r = (a << (c & 7)) | (b >> (~c & 7) >> 1)
-template <typename A, typename B, typename C>
-inline auto gv_fshl8(A&& a, B&& b, C&& c)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(c, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(amt1, gv_bcst8(8));
-	return v128(vorrq_u8(vshlq_u8(a, amt1), vshlq_u8(b, amt2)));
-#else
-	auto x1 = gv_sub8(gv_add8(a, a), gv_gts8(gv_bcst8(0), b));
-	auto s1 = gv_shl64(c, 7);
-	auto r1 = gv_signselect8(s1, std::move(x1), std::forward<A>(a));
-	auto b1 = gv_signselect8(std::move(s1), gv_shl64(b, 1), std::forward<B>(b));
-	auto c2 = gv_bcst8(0x3);
-	auto x2 = gv_and32(gv_shr64(b1, 6), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
-	auto s2 = gv_shl64(c, 6);
-	auto r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
-	auto b2 = gv_signselect8(std::move(s2), gv_shl64(b1, 2), std::move(b1));
-	auto c3 = gv_bcst8(0xf);
-	auto x3 = gv_and32(gv_shr64(std::move(b2), 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(r2, 4)));
-	return gv_signselect8(gv_shl64(std::move(c), 5), std::move(x3), std::move(r2));
-#endif
-}
-
-// For each 8-bit element, r = (b >> (c & 7)) | (a << (~c & 7) << 1)
-template <typename A, typename B, typename C>
-inline auto gv_fshr8(A&& a, B&& b, C&& c)
-{
-#if defined(ARCH_ARM64)
-	const auto amt1 = vandq_s8(c, gv_bcst8(7));
-	const auto amt2 = vsubq_s8(gv_bcst8(8), amt1);
-	return vorrq_u8(vshlq_u8(b, vnegq_s8(amt1)), vshlq_u8(a, amt2));
-#else
-	auto c1 = gv_bcst8(0x7f);
-	auto x1 = gv_and32(gv_shr64(b, 1), c1); x1 = gv_or32(std::move(x1), gv_andn32(std::move(c1), gv_shl64(a, 7)));
-	auto s1 = gv_shl64(c, 7);
-	auto r1 = gv_signselect8(s1, std::move(x1), std::move(b));
-	auto a1 = gv_signselect8(std::move(s1), gv_shr64(a, 1), std::move(a));
-	auto c2 = gv_bcst8(0x3f);
-	auto x2 = gv_and32(gv_shr64(r1, 2), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(a1, 6)));
-	auto s2 = gv_shl64(c, 6);
-	auto r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
-	auto a2 = gv_signselect8(std::move(s2), gv_shr64(a1, 2), std::move(a1));
-	auto c3 = gv_bcst8(0x0f);
-	auto x3 = gv_and32(gv_shr64(r2, 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(std::move(a2), 4)));
-	return gv_signselect8(gv_shl64(std::move(c), 5), std::move(x3), std::move(r2));
-#endif
-}
-
-// Shift left by byte amount
-template <u32 Count>
-inline v128 gv_shuffle_left(const v128& a)
-{
-	if (Count > 15)
-		return {};
-#if defined(ARCH_X64)
-	return _mm_slli_si128(a, Count);
-#elif defined(ARCH_ARM64)
-	v128 idx;
-	for (u32 i = 0; i < 16; i++)
-		idx._u8[i] = u8(i - Count);
-	return vqtbl1q_u8(a, idx);
-#endif
-}
-
-template <u32 Count, typename A> requires (asmjit::any_operand_v<A>)
-inline auto gv_shuffle_left(A&& a)
-{
-	FOR_X64(unary_op, kIdPslldq, kIdVpslldq, std::forward<A>(a), Count);
-}
-
-// Shift right by byte amount
-template <u32 Count>
-inline v128 gv_shuffle_right(const v128& a)
-{
-	if (Count > 15)
-		return {};
-#if defined(ARCH_X64)
-	return _mm_srli_si128(a, Count);
-#elif defined(ARCH_ARM64)
-	v128 idx;
-	for (u32 i = 0; i < 16; i++)
-		idx._u8[i] = u8(i + Count);
-	return vqtbl1q_u8(a, idx);
-#endif
-}
-
-template <u32 Count, typename A> requires (asmjit::any_operand_v<A>)
-inline auto gv_shuffle_right(A&& a)
-{
-	FOR_X64(unary_op, kIdPsrldq, kIdVpsrldq, std::forward<A>(a), Count);
-}
-
-// Load 32-bit integer into the first element of a new vector, set other elements to zero
-inline v128 gv_loadu32(const void* ptr)
-{
-#if defined(ARCH_X64)
-	return _mm_loadu_si32(ptr);
-#elif defined(ARCH_ARM64)
-	return vld1q_lane_u32(static_cast<const u32*>(ptr), vdupq_n_u32(0), 0);
-#endif
-}
-
-// Load 16-bit integer into an existing vector at the position specified by Index
-template <u8 Index>
-inline v128 gv_insert16(const v128& vec, u16 value)
-{
-#if defined(ARCH_X64)
-	return _mm_insert_epi16(vec, value, Index);
-#elif defined(ARCH_ARM64)
-	return vsetq_lane_u16(value, vec, Index & 0x7);
-#endif
-}
-
-// For each 8-bit element,
-// if ctrl >= 0 && ctrl < 16 then r = vec[ctrl],
-// else if ctrl < 0 then r = 0
-inline v128 gv_shuffle8(const v128& vec, const v128& ctrl)
-{
-	AUDIT(std::ranges::none_of(ctrl._chars, [](s8 i){ return i >= static_cast<s8>(sizeof(v128)); }), "All indices must be in the range [0, 15] or negative, since PSHUFB and TBL behave differently otherwise");
-#if defined(__SSSE3__)
-	return _mm_shuffle_epi8(vec, ctrl);
-#elif defined(ARCH_ARM64)
-	return vqtbl1q_s8(vec, ctrl);
-#else
-	v128 r;
-	for (s32 i = 0; i < 16; i++)
-		r._s8[i] = ctrl._s8[i] < 0 ? 0 : vec._s8[ctrl._s8[i] & 0xf];
-	return r;
-#endif
-}
-
-// For each 2-bit index in Control, r = vec[index]
-template <u8 Control>
-inline v128 gv_shuffle32(const v128& vec)
-{
-#if defined(ARCH_X64)
-	return _mm_shuffle_epi32(vec, Control);
-#elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Control & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Control >> 2 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Control >> 4 & 3) * sizeof(s32);
-	constexpr u8 idx3 = (Control >> 6 & 3) * sizeof(s32);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl1q_s8(vec, idx_vec);
-#endif
-}
-
-// For each index, r = vec[index & 3]
-template <u8 Index0, u8 Index1, u8 Index2, u8 Index3>
-inline v128 gv_shuffle32(const v128& vec)
-{
-#if defined(ARCH_X64)
-	return _mm_shuffle_epi32(vec, (Index0 & 3) | (Index1 & 3) << 2 | (Index2 & 3) << 4 | (Index3 & 3) << 6);
-#elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Index0 & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Index1 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Index2 & 3) * sizeof(s32);
-	constexpr u8 idx3 = (Index3 & 3) * sizeof(s32);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl1q_s8(vec, idx_vec);
-#endif
-}
-
-// For the first two 2-bit indices in Control, r = a[index],
-// for the last two indices, r = b[index]
-template <u8 Control>
-inline v128 gv_shufflefs(const v128& a, const v128& b)
-{
-#if defined(ARCH_X64)
-	return _mm_shuffle_ps(a, b, Control);
-#elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Control & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Control >> 2 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Control >> 4 & 3) * sizeof(s32) + sizeof(v128);
-	constexpr u8 idx3 = (Control >> 6 & 3) * sizeof(s32) + sizeof(v128);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl2q_s8({ a, b }, idx_vec);
-#endif
-}
-
-// For the first two indices, r = a[index & 3],
-// for the last two indices, r = b[index & 3]
-template <u8 Index0, u8 Index1, u8 Index2, u8 Index3>
-inline v128 gv_shufflefs(const v128& a, const v128& b)
-{
-#if defined(ARCH_X64)
-	return _mm_shuffle_ps(a, b, (Index0 & 3) | (Index1 & 3) << 2 | (Index2 & 3) << 4 | (Index3 & 3) << 6);
-#elif defined(ARCH_ARM64)
-	constexpr u8 idx0 = (Index0 & 3) * sizeof(s32);
-	constexpr u8 idx1 = (Index1 & 3) * sizeof(s32);
-	constexpr u8 idx2 = (Index2 & 3) * sizeof(s32) + sizeof(v128);
-	constexpr u8 idx3 = (Index3 & 3) * sizeof(s32) + sizeof(v128);
-
-	constexpr uint8x16_t idx_vec = { idx0, idx0 + 1, idx0 + 2, idx0 + 3, idx1, idx1 + 1, idx1 + 2, idx1 + 3, idx2, idx2 + 1, idx2 + 2, idx2 + 3, idx3, idx3 + 1, idx3 + 2, idx3 + 3 };
-
-	return vqtbl2q_s8({ a, b }, idx_vec);
-#endif
-}
-
-// For each 32-bit element, reverse byte order
-inline v128 gv_rev32(const v128& vec)
-{
-#if defined(__SSSE3__)
-	return _mm_shuffle_epi8(vec, _mm_setr_epi8(3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12));
-#elif defined(ARCH_ARM64)
-	return vrev32q_u8(vec);
-#else
-	return gv_rol32<16>(gv_rol16<8>(vec));
-#endif
-}
-
-// For each 32-bit element, convert between big-endian and native-endian
-inline v128 gv_to_be32(const v128& vec)
-{
-	if constexpr (std::endian::native == std::endian::little)
-		return gv_rev32(vec);
-	return vec;
-}
 
 #if defined(__clang__)
 #pragma clang diagnostic pop

@@ -101,7 +101,7 @@ static u64 make_null_function(const std::string& name)
 		const auto func = build_function_asm<void (*)()>("NULL", [&](native_asm& c, auto& args)
 		{
 #if defined(ARCH_X64)
-			Label data = c.newLabel();
+			Label data = c.new_label();
 			c.lea(args[0], x86::qword_ptr(data, 0));
 			c.jmp(Imm(&null));
 			c.align(AlignMode::kCode, 16);
@@ -114,8 +114,8 @@ static u64 make_null_function(const std::string& name)
 			c.align(AlignMode::kData, 16);
 #else
 			// AArch64 implementation
-			Label data = c.newLabel();
-			Label jump_address = c.newLabel();
+			Label data = c.new_label();
+			Label jump_address = c.new_label();
 			c.ldr(args[0], arm::ptr(data, 0));
 			c.ldr(a64::x14, arm::ptr(jump_address, 0));
 			c.br(a64::x14);

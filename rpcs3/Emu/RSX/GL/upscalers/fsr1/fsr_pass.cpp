@@ -120,7 +120,7 @@ namespace gl
 				"#define SAMPLE_EASU 1\n"
 				"#define SAMPLE_RCAS 0\n"
 				"#define SAMPLE_BILINEAR 0\n"
-				"#define SAMPLE_SLOW_FALLBACK 1",
+				"#define SAMPLE_SLOW_FALLBACK 0",  // Disable slow fallback for better FPS
 				80 // 5*VEC4
 			)
 		{}
@@ -144,7 +144,7 @@ namespace gl
 				"#define SAMPLE_RCAS 1\n"
 				"#define SAMPLE_EASU 0\n"
 				"#define SAMPLE_BILINEAR 0\n"
-				"#define SAMPLE_SLOW_FALLBACK 1",
+				"#define SAMPLE_SLOW_FALLBACK 0",  // Disable slow fallback for better FPS
 				32 // 2*VEC4
 			)
 		{}

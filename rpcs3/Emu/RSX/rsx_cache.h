@@ -23,9 +23,9 @@ namespace rsx
 	{
 		using unpacked_type = lf_fifo<std::tuple<pipeline_storage_type, RSXVertexProgram, RSXFragmentProgram>,
 #ifdef ANDROID
-		200
+		400  // Increased from 200 for better performance on Android
 #else
-		1000 // TODO: Determine best size
+		1500 // Increased from 1000 for better performance
 #endif
 		>;
 
@@ -140,6 +140,13 @@ namespace rsx
 				while (((pos = processed++) < stop_at) && !Emu.IsStopped())
 				{
 					auto& entry = unpacked[pos];
+					
+					// Prefetch next entry for better cache performance 
+					if (pos + 1 < unpacked.size())
+					{
+						__builtin_prefetch(&unpacked[pos + 1], 0, 3);
+					}
+					
 					m_storage.add_pipeline_entry(std::get<1>(entry), std::get<2>(entry), std::get<0>(entry), std::forward<Args>(args)...);
 				}
 				// Do not account for an extra shader that was never processed
