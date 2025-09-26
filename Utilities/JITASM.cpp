@@ -22,7 +22,16 @@ void jit_announce(uptr func, usz size, std::string_view name)
 #if 0
 	static const struct tmp_perf_map
 	{
-		std::string name{fmt::format("/tmp/perf-%d.map", getpid())};
+		std::string name{fmt::fo	if (!co.isValid())
+		co = consts[val] = this->new_label();
+	if (auto zr = x86::zmm(v.id()); zr == v)
+		this->vbroadcasti32x4(zr, x86::oword_ptr(co));
+	else if (auto yr = x86::ymm(v.id()); yr == v)
+		this->vbroadcasti128(yr, x86::oword_ptr(co));
+	else if (utils::has_avx())
+		this->vmovaps(x86::xmm(v.id()), x86::oword_ptr(co));
+	else
+		this->movaps(x86::xmm(v.id()), x86::oword_ptr(co));/perf-%d.map", getpid())};
 		fs::file data{name, fs::rewrite + fs::append};
 
 		tmp_perf_map() = default;
@@ -219,14 +228,14 @@ const asmjit::Environment& jit_runtime_base::environment() const noexcept
 
 void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 {
-	ensure(!code->flatten());
-	ensure(!code->resolveUnresolvedLinks());
+	ensure(code->flatten() == asmjit::kErrorOk);
+	ensure(code->resolve_unresolved_links() == asmjit::kErrorOk);
 	usz codeSize = code->code_size();
 	if (!codeSize)
 		return nullptr;
 
 	auto p = ensure(this->_alloc(codeSize, align));
-	ensure(!code->relocateToBase(uptr(p)));
+	ensure(code->relocate_to_base(uptr(p)) == asmjit::kErrorOk);
 
 	{
 		// We manage rw <-> rx transitions manually on Apple
@@ -237,12 +246,12 @@ void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 
 		for (asmjit::Section* section : code->_sections)
 		{
-			if (section->offset() + section->bufferSize() > utils::align<usz>(codeSize, align))
+			if (section->offset() + section->buffer_size() > utils::align<usz>(codeSize, align))
 			{
-				fmt::throw_exception("CodeHolder section exceeds range: Section->offset: 0x%x, Section->bufferSize: 0x%x, alloted-memory=0x%x", section->offset(), section->bufferSize(), utils::align<usz>(codeSize, align));
+				fmt::throw_exception("CodeHolder section exceeds range: Section->offset: 0x%x, Section->buffer_size: 0x%x, alloted-memory=0x%x", section->offset(), section->buffer_size(), utils::align<usz>(codeSize, align));
 			}
 
-			std::memcpy(p + section->offset(), section->data(), section->bufferSize());
+			std::memcpy(p + section->offset(), section->data(), section->buffer_size());
 		}
 	}
 
@@ -473,7 +482,7 @@ void asmjit::simd_builder::vec_cleanup_ret()
 
 void asmjit::simd_builder::vec_set_all_zeros(const Operand& v)
 {
-	x86::Xmm reg(v.id());
+	auto reg = x86::xmm(v.id());
 	if (utils::has_avx())
 		this->vpxor(reg, reg, reg);
 	else
@@ -482,10 +491,10 @@ void asmjit::simd_builder::vec_set_all_zeros(const Operand& v)
 
 void asmjit::simd_builder::vec_set_all_ones(const Operand& v)
 {
-	x86::Xmm reg(v.id());
-	if (x86::Zmm zr(v.id()); zr == v)
+	auto reg = x86::xmm(v.id());
+	if (auto zr = x86::zmm(v.id()); zr == v)
 		this->vpternlogd(zr, zr, zr, 0xff);
-	else if (x86::Ymm yr(v.id()); yr == v)
+	else if (auto yr = x86::ymm(v.id()); yr == v)
 		this->vpcmpeqd(yr, yr, yr);
 	else if (utils::has_avx())
 		this->vpcmpeqd(reg, reg, reg);
@@ -509,9 +518,9 @@ void asmjit::simd_builder::vec_set_const(const Operand& v, const v128& val)
 		else if (x86::Ymm yr(v.id()); yr == v)
 			this->vbroadcasti128(yr, x86::oword_ptr(co));
 		else if (utils::has_avx())
-			this->vmovaps(x86::Xmm(v.id()), x86::oword_ptr(co));
+			this->vmovaps(x86::xmm(v.id()), x86::oword_ptr(co));
 		else
-			this->movaps(x86::Xmm(v.id()), x86::oword_ptr(co));
+			this->movaps(x86::xmm(v.id()), x86::oword_ptr(co));
 	}
 }
 
@@ -625,7 +634,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 		if (vsize == 2)
 			vec_set_all_zeros(v);
 		if (vsize == 2 && utils::has_avx())
-			this->emit(x86::Inst::kIdVpinsrw, x86::Xmm(v.id()), x86::Xmm(v.id()), src, Imm(0));
+			this->emit(x86::Inst::kIdVpinsrw, x86::xmm(v.id()), x86::xmm(v.id()), src, Imm(0));
 		else if (vsize == 2)
 			this->emit(x86::Inst::kIdPinsrw, v, src, Imm(0));
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -637,7 +646,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 	{
 		ensure(vsize >= 4);
 		if (vsize == 4 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovd, x86::Xmm(v.id()), src);
+			this->emit(x86::Inst::kIdVmovd, x86::xmm(v.id()), src);
 		else if (vsize == 4)
 			this->emit(x86::Inst::kIdMovd, v, src);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -649,7 +658,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 	{
 		ensure(vsize >= 8);
 		if (vsize == 8 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovq, x86::Xmm(v.id()), src);
+			this->emit(x86::Inst::kIdVmovq, x86::xmm(v.id()), src);
 		else if (vsize == 8)
 			this->emit(x86::Inst::kIdMovq, v, src);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -682,11 +691,11 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 2);
 		if (vsize == 2 && utils::has_avx())
-			this->emit(x86::Inst::kIdVpextrw, dst, x86::Xmm(v.id()), Imm(0));
+			this->emit(x86::Inst::kIdVpextrw, dst, x86::xmm(v.id()), Imm(0));
 		else if (vsize == 2 && utils::has_sse41())
 			this->emit(x86::Inst::kIdPextrw, dst, v, Imm(0));
 		else if (vsize == 2)
-			this->push(x86::rax), this->pextrw(x86::eax, x86::Xmm(v.id()), 0), this->mov(dst, x86::ax), this->pop(x86::rax);
+			this->push(x86::rax), this->pextrw(x86::eax, x86::xmm(v.id()), 0), this->mov(dst, x86::ax), this->pop(x86::rax);
 		else if ((vmask && vmask < 8) || vsize >= 64)
 			this->emit(x86::Inst::kIdVmovdqu16, dst, v);
 		else
@@ -696,7 +705,7 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 4);
 		if (vsize == 4 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovd, dst, x86::Xmm(v.id()));
+			this->emit(x86::Inst::kIdVmovd, dst, x86::xmm(v.id()));
 		else if (vsize == 4)
 			this->emit(x86::Inst::kIdMovd, dst, v);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -708,7 +717,7 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 8);
 		if (vsize == 8 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovq, dst, x86::Xmm(v.id()));
+			this->emit(x86::Inst::kIdVmovq, dst, x86::xmm(v.id()));
 		else if (vsize == 8)
 			this->emit(x86::Inst::kIdMovq, dst, v);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -830,17 +839,17 @@ void asmjit::simd_builder::vec_cmp_eq(u32 esize, const Operand& dst, const Opera
 void asmjit::simd_builder::vec_extract_high(u32, const Operand& dst, const Operand& src)
 {
 	if (vsize == 32)
-		this->vextracti32x8(x86::Ymm(dst.id()), x86::Zmm(src.id()), 1);
+		this->vextracti32x8(x86::ymm(dst.id()), x86::Zmm(src.id()), 1);
 	else if (vsize == 16)
-		this->vextracti128(x86::Xmm(dst.id()), x86::Ymm(src.id()), 1);
+		this->vextracti128(x86::xmm(dst.id()), x86::ymm(src.id()), 1);
 	else
 	{
 		if (utils::has_avx())
-			this->vpsrldq(x86::Xmm(dst.id()), x86::Xmm(src.id()), vsize);
+			this->vpsrldq(x86::xmm(dst.id()), x86::xmm(src.id()), vsize);
 		else
 		{
-			this->movdqa(x86::Xmm(dst.id()), x86::Xmm(src.id()));
-			this->psrldq(x86::Xmm(dst.id()), vsize);
+			this->movdqa(x86::xmm(dst.id()), x86::xmm(src.id()));
+			this->psrldq(x86::xmm(dst.id()), vsize);
 		}
 	}
 }
@@ -848,17 +857,17 @@ void asmjit::simd_builder::vec_extract_high(u32, const Operand& dst, const Opera
 void asmjit::simd_builder::vec_extract_gpr(u32 esize, const x86::Gp& dst, const Operand& src)
 {
 	if (esize == 8 && utils::has_avx())
-		this->vmovq(dst.r64(), x86::Xmm(src.id()));
+		this->vmovq(dst.r64(), x86::xmm(src.id()));
 	else if (esize == 8)
-		this->movq(dst.r64(), x86::Xmm(src.id()));
+		this->movq(dst.r64(), x86::xmm(src.id()));
 	else if (esize == 4 && utils::has_avx())
-		this->vmovd(dst.r32(), x86::Xmm(src.id()));
+		this->vmovd(dst.r32(), x86::xmm(src.id()));
 	else if (esize == 4)
-		this->movd(dst.r32(), x86::Xmm(src.id()));
+		this->movd(dst.r32(), x86::xmm(src.id()));
 	else if (esize == 2 && utils::has_avx())
-		this->vpextrw(dst.r32(), x86::Xmm(src.id()), 0);
+		this->vpextrw(dst.r32(), x86::xmm(src.id()), 0);
 	else if (esize == 2)
-		this->pextrw(dst.r32(), x86::Xmm(src.id()), 0);
+		this->pextrw(dst.r32(), x86::xmm(src.id()), 0);
 	else
 		fmt::throw_exception("Unimplemented");
 }
