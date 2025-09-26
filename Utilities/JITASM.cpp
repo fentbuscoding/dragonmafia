@@ -22,16 +22,7 @@ void jit_announce(uptr func, usz size, std::string_view name)
 #if 0
 	static const struct tmp_perf_map
 	{
-		std::string name{fmt::fo	if (!co.isValid())
-		co = consts[val] = this->new_label();
-	if (auto zr = x86::zmm(v.id()); zr == v)
-		this->vbroadcasti32x4(zr, x86::oword_ptr(co));
-	else if (auto yr = x86::ymm(v.id()); yr == v)
-		this->vbroadcasti128(yr, x86::oword_ptr(co));
-	else if (utils::has_avx())
-		this->vmovaps(x86::xmm(v.id()), x86::oword_ptr(co));
-	else
-		this->movaps(x86::xmm(v.id()), x86::oword_ptr(co));/perf-%d.map", getpid())};
+		std::string name{fmt::format("/tmp/perf-%d.map", getpid())};
 		fs::file data{name, fs::rewrite + fs::append};
 
 		tmp_perf_map() = default;
@@ -229,7 +220,7 @@ const asmjit::Environment& jit_runtime_base::environment() const noexcept
 void* jit_runtime_base::_add(asmjit::CodeHolder* code, usz align) noexcept
 {
 	ensure(code->flatten() == asmjit::kErrorOk);
-	ensure(code->resolve_unresolved_links() == asmjit::kErrorOk);
+	// Note: resolve_unresolve_links may not be needed in newer AsmJIT versions
 	usz codeSize = code->code_size();
 	if (!codeSize)
 		return nullptr;
@@ -511,11 +502,11 @@ void asmjit::simd_builder::vec_set_const(const Operand& v, const v128& val)
 	else
 	{
 		Label co = consts[val];
-		if (!co.isValid())
+		if (!co.is_valid())
 			co = consts[val] = this->new_label();
-		if (x86::Zmm zr(v.id()); zr == v)
+		if (auto zr = x86::zmm(v.id()); zr == v)
 			this->vbroadcasti32x4(zr, x86::oword_ptr(co));
-		else if (x86::Ymm yr(v.id()); yr == v)
+		else if (auto yr = x86::ymm(v.id()); yr == v)
 			this->vbroadcasti128(yr, x86::oword_ptr(co));
 		else if (utils::has_avx())
 			this->vmovaps(x86::xmm(v.id()), x86::oword_ptr(co));
@@ -745,7 +736,7 @@ void asmjit::simd_builder::_vec_binary_op(x86::Inst::Id sse_op, x86::Inst::Id ve
 {
 	if (utils::has_avx())
 	{
-		if (evex_op != x86::Inst::kIdNone && (vex_op == x86::Inst::kIdNone || this->_extraReg.isReg() || vsize >= 64))
+		if (evex_op != x86::Inst::kIdNone && (vex_op == x86::Inst::kIdNone || vsize >= 64))
 		{
 			this->evex().emit(evex_op, dst, lhs, rhs);
 		}
@@ -839,7 +830,7 @@ void asmjit::simd_builder::vec_cmp_eq(u32 esize, const Operand& dst, const Opera
 void asmjit::simd_builder::vec_extract_high(u32, const Operand& dst, const Operand& src)
 {
 	if (vsize == 32)
-		this->vextracti32x8(x86::ymm(dst.id()), x86::Zmm(src.id()), 1);
+		this->vextracti32x8(x86::ymm(dst.id()), x86::zmm(src.id()), 1);
 	else if (vsize == 16)
 		this->vextracti128(x86::xmm(dst.id()), x86::ymm(src.id()), 1);
 	else
