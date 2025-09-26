@@ -129,12 +129,12 @@ namespace asmjit
 			if (!~vec_allocated)
 			{
 				fail_flag = true;
-				return vec_type{0};
+				return vec_type{};
 			}
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return vec_type{idx};
+			return vec_type(x86::Vec::kSignatureXmm, idx);
 		}
 
 		template <u32 Size>
@@ -245,34 +245,34 @@ namespace asmjit
 				{
 					if (_c._u8[0] == _c._u8[1])
 					{
-						ensure(!g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0])));
+						g_vc->vpbroadcastb(reg, g_vc->get_const(_c._u8[0]));
 					}
 					else
 					{
-						ensure(!g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0])));
+						g_vc->vpbroadcastw(reg, g_vc->get_const(_c._u16[0]));
 					}
 				}
 				else
 				{
-					ensure(!g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0])));
+					g_vc->vbroadcastss(reg, g_vc->get_const(_c._u32[0]));
 				}
 			}
 			else
 			{
-				ensure(!g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0])));
+				g_vc->vbroadcastsd(reg, g_vc->get_const(_c._u32[0]));
 			}
 		}
 		else if (!_c._u)
 		{
-			ensure(!g_vc->pxor(reg, reg));
+			g_vc->pxor(reg, reg);
 		}
 		else if (!~_c._u)
 		{
-			ensure(!g_vc->pcmpeqd(reg, reg));
+			g_vc->pcmpeqd(reg, reg);
 		}
 		else
 		{
-			ensure(!g_vc->movaps(reg, g_vc->get_const(_c, esize)));
+			g_vc->movaps(reg, g_vc->get_const(_c, esize));
 		}
 
 		g_vc->const_allocs.emplace(_c, reg);
@@ -324,7 +324,7 @@ namespace asmjit
 	{
 		if (op.is_reg())
 		{
-			g_vc->vec_dealloc(vec_type{op.id()});
+			g_vc->vec_dealloc(vec_type(x86::Vec::kSignatureXmm, op.id()));
 		}
 	}
 
@@ -429,8 +429,8 @@ namespace asmjit
 
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
-				ensure(!g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
+				g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
+				return vec_type(x86::Vec::kSignatureXmm, src1.id());
 			}
 
 			if constexpr (arg_classify<B> == arg_class::reg_rv)
@@ -467,12 +467,12 @@ namespace asmjit
 
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
-				ensure(!g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
-				return vec_type{src1.id()};
+				g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
+				return vec_type(x86::Vec::kSignatureXmm, src1.id());
 			}
 
-			ensure(!g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
-			return vec_type{src1.id()};
+			g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...);
+			return vec_type(x86::Vec::kSignatureXmm, src1.id());
 		}
 		else do
 		{
@@ -517,13 +517,13 @@ namespace asmjit
 				if (!a._u)
 				{
 					// All zeros
-					ensure(!g_vc->emit(x86::Inst::kIdPxor, src1, src1));
+					g_vc->emit(x86::Inst::kIdPxor, src1, src1);
 					break;
 				}
 				else if (!~a._u)
 				{
 					// All ones
-					ensure(!g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1));
+					g_vc->emit(x86::Inst::kIdPcmpeqd, src1, src1);
 					break;
 				}
 			}
@@ -546,7 +546,7 @@ namespace asmjit
 			ensure(!g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
 		}
 
-		return vec_type{src1.id()};
+		return vec_type(x86::Vec::kSignatureXmm, src1.id());
 	}
 #define FOR_X64(f, ...) do { using enum asmjit::x86::Inst::Id; return asmjit::f(__VA_ARGS__); } while (0)
 #elif defined(ARCH_ARM64)
@@ -2472,7 +2472,7 @@ inline asmjit::vec_type gv_signselect8(A&& bits, B&& _true, C&& _false)
 	}
 #endif
 	g_vc->fail_flag = true;
-	return vec_type{0};
+	return vec_type{};
 }
 
 // Select elements; _cmp must be result of SIMD comparison; undefined otherwise
