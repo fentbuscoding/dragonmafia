@@ -5091,10 +5091,8 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 #if defined(ARCH_X64)
 			c.mov(x86::edx, func_addr - seg0); // Load PC
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
-
-			code_size_until_jump = buf_end - buf_start;
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());			code_size_until_jump = buf_end - buf_start;
 
 			c.add(x86::edx, seg0);
 			c.movabs(x86::rax, reinterpret_cast<u64>(&vm::g_exec_addr));
@@ -5122,17 +5120,15 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 			const arm::GpX cia_addr_reg = a64::x11;
 
 			// Load CIA
-			c.mov(pc.w(), func_addr);
+		c.mov(pc.w(), func_addr);
 
-			const auto buf_start = reinterpret_cast<const u8*>(c.bufferData());
-			const auto buf_end = reinterpret_cast<const u8*>(c.bufferPtr());
+		const auto buf_start = reinterpret_cast<const u8*>(c.buffer_data());
+		const auto buf_end = reinterpret_cast<const u8*>(c.buffer_ptr());
 
-			code_size_until_jump = buf_end - buf_start;
+		code_size_until_jump = buf_end - buf_start;
 
-			// Load offset value
-			c.mov(cia_addr_reg, static_cast<u64>(::offset32(&ppu_thread::cia)));
-
-			// Update CIA
+		// Load offset value
+		c.mov(cia_addr_reg, static_cast<u64>(::offset32(&ppu_thread::cia)));			// Update CIA
 			c.str(pc.w(), arm::Mem(ppu_t_base, cia_addr_reg));
 
 			// Multiply by 2 to index into ptr table

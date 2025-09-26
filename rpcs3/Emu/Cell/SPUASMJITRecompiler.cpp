@@ -158,9 +158,9 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 		vec[i] = vec_vars[i];
 	}
 
-	label_stop = c->newLabel();
-	Label label_diff = c->newLabel();
-	Label label_code = c->newLabel();
+	label_stop = c->new_label();
+	Label label_diff = c->new_label();
+	Label label_code = c->new_label();
 	std::vector<u32> words;
 	u32 words_align = 8;
 
@@ -176,7 +176,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	{
 		if (func.data[i] && m_block_info[i + start / 4])
 		{
-			instr_labels[i * 4 + start] = c->newLabel();
+			instr_labels[i * 4 + start] = c->new_label();
 		}
 	}
 
@@ -319,7 +319,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 			if (cmask != 0xffff)
 			{
 				// Generate k-mask for the block
-				Label label = c->newLabel();
+				Label label = c->new_label();
 				c->kmovw(x86::k7, x86::word_ptr(label));
 
 				consts.emplace_back([=, this]
@@ -849,7 +849,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	}
 
 	// Build instruction dispatch table
-	if (instr_table.isValid())
+	if (instr_table.is_valid())
 	{
 		c->align(AlignMode::kData, 8);
 		c->bind(instr_table);
@@ -958,9 +958,9 @@ inline asmjit::x86::Mem spu_recompiler::XmmConst(const v128& data)
 	// Find existing const
 	auto& xmm_label = xmm_consts[std::make_pair(data._u64[0], data._u64[1])];
 
-	if (!xmm_label.isValid())
+	if (!xmm_label.is_valid())
 	{
-		xmm_label = c->newLabel();
+		xmm_label = c->new_label();
 
 		consts.emplace_back([=, this]
 		{
@@ -994,7 +994,7 @@ void spu_recompiler::branch_fixed(u32 target, bool absolute)
 	// Check local branch
 	const auto local = instr_labels.find(target);
 
-	if (local != instr_labels.end() && local->second.isValid())
+	if (local != instr_labels.end() && local->second.is_valid())
 	{
 		Label fail;
 
@@ -1128,7 +1128,7 @@ void spu_recompiler::branch_indirect(spu_opcode_t op, bool jt, bool ret)
 
 	if (jt || g_cfg.core.spu_block_size == spu_block_size_type::giga)
 	{
-		if (!instr_table.isValid())
+		if (!instr_table.is_valid())
 		{
 			// Request instruction table
 			instr_table = c->newLabel();
@@ -1171,13 +1171,11 @@ void spu_recompiler::branch_set_link(u32 target)
 	if (g_cfg.core.spu_block_size != spu_block_size_type::safe)
 	{
 		// Find instruction at target
-		const auto local = instr_labels.find(target);
+	const auto local = instr_labels.find(target);
 
-		if (local != instr_labels.end() && local->second.isValid())
-		{
-			Label ret = c->newLabel();
-
-			// Get stack pointer, write native and SPU return addresses into the stack mirror
+	if (local != instr_labels.end() && local->second.is_valid())
+	{
+		Label ret = c->newLabel();			// Get stack pointer, write native and SPU return addresses into the stack mirror
 			c->mov(qw1->r32(), SPU_OFF_32(gpr, 1, &v128::_u32, 3));
 			c->and_(qw1->r32(), 0x3fff0);
 			c->lea(*qw1, x86::qword_ptr(*cpu, *qw1, 0, ::offset32(&spu_thread::stack_mirror)));

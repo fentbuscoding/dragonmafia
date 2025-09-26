@@ -177,11 +177,9 @@ namespace asmjit
 		static constexpr x86::Gp arg_next_fn = x86::rcx;
 #endif
 
-		u32 xmm_count = 0;
-		u32 ppu_base = 0;
-		x86::Xmm tmp;
-
-		ppu_builder(CodeHolder* ch)
+	u32 xmm_count = 0;
+	u32 ppu_base = 0;
+	decltype(asmjit::x86::xmm(0)) tmp = asmjit::x86::xmm(0);		ppu_builder(CodeHolder* ch)
 			: base(ch)
 		{
 		}
@@ -204,12 +202,12 @@ namespace asmjit
 			}
 			else
 			{
-				base::mov(tmp_r32, arg_op);
+				this->mov(tmp_r32, arg_op);
 
 				if (offset % 16 == 0 && ppu_base != offset)
 				{
 					// Optimistically precompute offset to avoid [ppu + tmp*x + offset] addressing
-					base::lea(x86::r10, x86::qword_ptr(arg_ppu, static_cast<s32>(offset)));
+					this->lea(x86::r10, x86::qword_ptr(arg_ppu, static_cast<s32>(offset)));
 					ppu_base = offset;
 				}
 			}
@@ -227,13 +225,13 @@ namespace asmjit
 			if constexpr (I >= AddShift)
 			{
 				if constexpr (I != AddShift)
-					base::shr(tmp_r32, I - AddShift);
-				base::and_(tmp_r32, AndMask << AddShift);
+					this->shr(tmp_r32, I - AddShift);
+				this->and_(tmp_r32, AndMask << AddShift);
 			}
 			else
 			{
-				base::and_(tmp_r32, AndMask << I);
-				base::shl(tmp_r32, I + AddShift);
+				this->and_(tmp_r32, AndMask << I);
+				this->shl(tmp_r32, I + AddShift);
 			}
 
 			return x86::ptr(reg_ppu, tmp_r32.r64(), X86Shift, static_cast<s32>(offset - ppu_base), Size);
@@ -259,19 +257,17 @@ namespace asmjit
 
 		void ppu_ret(bool last = true)
 		{
-			// Initialize pointer to next function
-			base::mov(x86::rax, x86::qword_ptr(arg_next_fn));
-			base::add(arg_this_op, 4);
-			if (is_debugger_present())
-				base::mov(ppu_mem<&ppu_thread::cia>(), arg_this_op.r32());
-			base::mov(arg_op, x86::dword_ptr(arg_this_op));
-			base::bswap(arg_op);
-			base::add(arg_next_fn, 8);
-			base::jmp(x86::rax);
-
-			// Embed constants (TODO: after last return)
+		// Initialize pointer to next function
+		this->mov(x86::rax, x86::qword_ptr(arg_next_fn));
+		this->add(arg_this_op, 4);
+		if (is_debugger_present())
+			this->mov(ppu_mem<&ppu_thread::cia>(), arg_this_op.r32());
+		this->mov(arg_op, x86::dword_ptr(arg_this_op));
+		this->bswap(arg_op);
+		this->add(arg_next_fn, 8);
+		this->jmp(x86::rax);			// Embed constants (TODO: after last return)
 			if (last)
-				base::emit_consts();
+				static_cast<vec_builder&>(*this).emit_consts();
 		}
 	};
 #elif defined(ARCH_ARM64)
@@ -294,7 +290,7 @@ struct ppu_abstract_t
 		{
 			const asmjit::Operand& eval(bool is_lv)
 			{
-				if (is_lv && !this->isReg())
+				if (is_lv && !this->is_reg())
 				{
 					Operand::operator=(g_vc->vec_alloc());
 				#if defined(ARCH_X64)
@@ -304,7 +300,7 @@ struct ppu_abstract_t
 
 				if (!is_lv)
 				{
-					if (this->isReg())
+					if (this->is_reg())
 					{
 						g_vc->vec_dealloc(asmjit::vec_type{this->id()});
 					}
@@ -1981,11 +1977,11 @@ auto VPERM()
 	{
 		static const ppu_intrp_func_t f = build_function_asm<ppu_intrp_func_t, asmjit::ppu_builder>("ppu_VPERM", [&](asmjit::ppu_builder& c, native_args&)
 		{
-			const auto [v0, v1, v2, v3] = c.vec_alloc<4>();
+			const auto [v0, v1, v2, v3] = static_cast<vec_builder&>(c).vec_alloc<4>();
 			c.movdqa(v0, c.ppu_vr(s_op.vc));
-			c.pandn(v0, c.get_const(v128::from8p(0x1f)));
+			c.pandn(v0, static_cast<vec_builder&>(c).get_const(v128::from8p(0x1f)));
 			c.movdqa(v1, v0);
-			c.pcmpgtb(v1, c.get_const(v128::from8p(0xf)));
+			c.pcmpgtb(v1, static_cast<vec_builder&>(c).get_const(v128::from8p(0xf)));
 			c.movdqa(v2, c.ppu_vr(s_op.va));
 			c.movdqa(v3, c.ppu_vr(s_op.vb));
 			c.pshufb(v2, v0);
