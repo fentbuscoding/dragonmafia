@@ -45,7 +45,7 @@ namespace asmjit
 {
 #if defined(ARCH_X64)
 	using gpr_type = x86::Gp;
-	using vec_type = x86::Xmm;
+	using vec_type = x86::Vec;
 	using mem_type = x86::Mem;
 #else
 	struct gpr_type : Operand
@@ -198,7 +198,7 @@ namespace asmjit
 			auto& _label = consts[Size - 1][key];
 
 			if (!_label.is_valid())
-				_label = this->newLabel();
+				_label = this->new_label();
 
 			return x86::Mem(_label, 0, Size);
 		}
@@ -322,7 +322,7 @@ namespace asmjit
 
 	inline void arg_free(const Operand& op)
 	{
-		if (op.isReg())
+		if (op.is_reg())
 		{
 			g_vc->vec_dealloc(vec_type{op.id()});
 		}
@@ -340,12 +340,12 @@ namespace asmjit
 		{
 			// Check if broadcast is set, or if the offset immediate can use disp8*N encoding
 			mem_type mem{};
-			mem.copyFrom(op);
-			if (mem.hasBaseLabel())
+			mem.copy_from(op);
+			if (mem.has_base_label())
 				return false;
-			if (mem.hasBroadcast())
+			if (mem.has_broadcast())
 				return true;
-			if (!mem.hasOffset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
+			if (!mem.has_offset() || mem.offset() % mem.size() || u64(mem.offset() + 128) < 256 || u64(mem.offset() / mem.size() + 128) >= 256)
 				return false;
 			return true;
 		}
@@ -402,11 +402,11 @@ namespace asmjit
 		static_assert(arg_classify<D> == arg_class::mem_lv);
 
 		mem_type dst;
-		dst.copyFrom(arg_eval(std::forward<D>(d), 16));
+		dst.copy_from(arg_eval(std::forward<D>(d), 16));
 
 		if (utils::has_avx512() && evex_op)
 		{
-			if (!dst.hasBaseLabel() && dst.hasOffset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
+			if (!dst.has_base_label() && dst.has_offset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
 			{
 				ensure(!g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)));
 				return;
@@ -478,7 +478,7 @@ namespace asmjit
 		{
 			if constexpr (arg_classify<A> == arg_class::mem_rv)
 			{
-				if (a.isReg())
+				if (a.is_reg())
 				{
 					src1 = vec_type(a.id());
 
@@ -2458,16 +2458,16 @@ inline asmjit::vec_type gv_signselect8(A&& bits, B&& _true, C&& _false)
 		Operand arg2 = arg_eval(std::forward<B>(_true), 16);
 		Operand arg3 = arg_eval(std::forward<C>(_false), 16);
 		if constexpr (!std::is_reference_v<A>)
-			arg0.isReg() ? arg_free(bits) : arg0.copyFrom(arg1);
+			arg0.is_reg() ? arg_free(bits) : arg0.copy_from(arg1);
 		if constexpr (!std::is_reference_v<B>)
-			arg0.isReg() ? arg_free(_true) : arg0.copyFrom(arg2);
+			arg0.is_reg() ? arg_free(_true) : arg0.copy_from(arg2);
 		if constexpr (!std::is_reference_v<C>)
-			arg0.isReg() ? arg_free(_false) : arg0.copyFrom(arg3);
-		if (arg0.isNone())
+			arg0.is_reg() ? arg_free(_false) : arg0.copy_from(arg3);
+		if (arg0.is_none())
 			arg0 = g_vc->vec_alloc();
 		g_vc->emit(x86::Inst::kIdVpblendvb, arg0, arg3, arg2, arg1);
 		vec_type r;
-		r.copyFrom(arg0);
+		r.copy_from(arg0);
 		return r;
 	}
 #endif
@@ -2875,15 +2875,17 @@ inline v128 gv_shr8(const v128& a, const v128& b)
 #else
 	const v128 x1 = gv_and32(gv_shr64(a, 1), gv_bcst8(0x7f)); // shift right by 1
 	const v128 r1 = gv_signselect8(gv_shl64(b, 7), x1, a);
-	const v128 b1 = gv_signselect8(std::move(s1), gv_shl64(b, 1), std::forward<B>(b));
+	const v128 b1 = gv_signselect8(gv_shl64(b, 7), gv_shl64(b, 1), b);
 	auto c2 = gv_bcst8(0x3);
-	const v128 x2 = gv_and32(gv_shr64(b1, 6), c2); x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
-	const v128 s2 = gv_shl64(c, 6);
-	const v128 r2 = gv_signselect8(s2, std::move(x2), std::move(r1));
-	const v128 a2 = gv_signselect8(std::move(s2), gv_shr64(a, 1), std::move(a));
+	v128 x2 = gv_and32(gv_shr64(b1, 6), c2); 
+	x2 = gv_or32(std::move(x2), gv_andn32(std::move(c2), gv_shl64(r1, 2)));
+	const v128 s2 = gv_shl64(b, 6);
+	const v128 r2 = gv_signselect8(s2, std::move(x2), r1);
+	const v128 a2 = gv_signselect8(s2, gv_shr64(a, 1), a);
 	auto c3 = gv_bcst8(0xf);
-	const v128 x3 = gv_and32(gv_shr64(r2, 4), c3); x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(a2, 4)));
-	return gv_signselect8(gv_shl64(c, 5), x3, r2);
+	v128 x3 = gv_and32(gv_shr64(r2, 4), c3); 
+	x3 = gv_or32(std::move(x3), gv_andn32(std::move(c3), gv_shl64(a2, 4)));
+	return gv_signselect8(gv_shl64(b, 5), x3, r2);
 #endif
 }
 

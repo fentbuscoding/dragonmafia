@@ -470,8 +470,8 @@ inline FT build_function_asm(std::string_view name, F&& builder, ::jit_runtime* 
 #endif
 
 	Asm compiler(&code);
-	compiler.addEncodingOptions(EncodingOptions::kOptimizedAlign);
-	compiler.addEncodingOptions(EncodingOptions::kOptimizeForSize);
+	compiler.add_encoding_options(EncodingOptions::kOptimizedAlign);
+	compiler.add_encoding_options(EncodingOptions::kOptimizeForSize);
 	if constexpr (std::is_invocable_r_v<bool, F, Asm&, native_args&>)
 	{
 		if (!builder(compiler, args))
