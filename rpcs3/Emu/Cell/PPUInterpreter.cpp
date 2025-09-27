@@ -179,10 +179,12 @@ namespace asmjit
 
 	u32 xmm_count = 0;
 	u32 ppu_base = 0;
-	decltype(asmjit::x86::xmm(0)) tmp = asmjit::x86::xmm(0);		ppu_builder(CodeHolder* ch)
-			: base(ch)
-		{
-		}
+	x86::Vec tmp = x86::Vec::make_v128(0);
+
+	ppu_builder(CodeHolder* ch)
+		: base(ch)
+	{
+	}
 
 		// Indexed offset to ppu.member
 		template <auto MPtr, u32 Size = sizeof((std::declval<ppu_thread&>().*MPtr)[0]), uint I, uint N>

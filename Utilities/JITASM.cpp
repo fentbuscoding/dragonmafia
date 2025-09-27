@@ -22,7 +22,17 @@ void jit_announce(uptr func, usz size, std::string_view name)
 #if 0
 	static const struct tmp_perf_map
 	{
-		std::string name{fmt::format("/tmp/perf-%d.map", getpid())};
+		std::string name{fmt::format		if 		if (auto yr = x86::ymm(v.id()); yr == v)
+			this->vbroadcasti128(yr, x86::oword_ptr(co));
+		else if (utils::has_avx())
+			this->vmovaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));
+		else
+			this->movaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));yr = x86::ymm(v.id()); yr == v)
+			this->vbroadcasti128(yr, x86::oword_ptr(co));
+		else if (utils::has_avx())
+			this->vmovaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));
+		else
+			this->movaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));/perf-%d.map", getpid())};
 		fs::file data{name, fs::rewrite + fs::append};
 
 		tmp_perf_map() = default;
@@ -473,7 +483,7 @@ void asmjit::simd_builder::vec_cleanup_ret()
 
 void asmjit::simd_builder::vec_set_all_zeros(const Operand& v)
 {
-	auto reg = x86::xmm(v.id());
+	auto reg = static_cast<const x86::Vec&>(v);
 	if (utils::has_avx())
 		this->vpxor(reg, reg, reg);
 	else
@@ -482,7 +492,7 @@ void asmjit::simd_builder::vec_set_all_zeros(const Operand& v)
 
 void asmjit::simd_builder::vec_set_all_ones(const Operand& v)
 {
-	auto reg = x86::xmm(v.id());
+	auto reg = static_cast<const x86::Vec&>(v);
 	if (auto zr = x86::zmm(v.id()); zr == v)
 		this->vpternlogd(zr, zr, zr, 0xff);
 	else if (auto yr = x86::ymm(v.id()); yr == v)
@@ -509,9 +519,9 @@ void asmjit::simd_builder::vec_set_const(const Operand& v, const v128& val)
 		else if (auto yr = x86::ymm(v.id()); yr == v)
 			this->vbroadcasti128(yr, x86::oword_ptr(co));
 		else if (utils::has_avx())
-			this->vmovaps(x86::xmm(v.id()), x86::oword_ptr(co));
+			this->vmovaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));
 		else
-			this->movaps(x86::xmm(v.id()), x86::oword_ptr(co));
+			this->movaps(static_cast<const x86::Vec&>(v), x86::oword_ptr(co));
 	}
 }
 
@@ -625,7 +635,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 		if (vsize == 2)
 			vec_set_all_zeros(v);
 		if (vsize == 2 && utils::has_avx())
-			this->emit(x86::Inst::kIdVpinsrw, x86::xmm(v.id()), x86::xmm(v.id()), src, Imm(0));
+			this->emit(x86::Inst::kIdVpinsrw, static_cast<const x86::Vec&>(v), static_cast<const x86::Vec&>(v), src, Imm(0));
 		else if (vsize == 2)
 			this->emit(x86::Inst::kIdPinsrw, v, src, Imm(0));
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -637,7 +647,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 	{
 		ensure(vsize >= 4);
 		if (vsize == 4 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovd, x86::xmm(v.id()), src);
+			this->emit(x86::Inst::kIdVmovd, static_cast<const x86::Vec&>(v), src);
 		else if (vsize == 4)
 			this->emit(x86::Inst::kIdMovd, v, src);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -649,7 +659,7 @@ void asmjit::simd_builder::vec_load_unaligned(u32 esize, const Operand& v, const
 	{
 		ensure(vsize >= 8);
 		if (vsize == 8 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovq, x86::xmm(v.id()), src);
+			this->emit(x86::Inst::kIdVmovq, static_cast<const x86::Vec&>(v), src);
 		else if (vsize == 8)
 			this->emit(x86::Inst::kIdMovq, v, src);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -682,11 +692,11 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 2);
 		if (vsize == 2 && utils::has_avx())
-			this->emit(x86::Inst::kIdVpextrw, dst, x86::xmm(v.id()), Imm(0));
+			this->emit(x86::Inst::kIdVpextrw, dst, static_cast<const x86::Vec&>(v), Imm(0));
 		else if (vsize == 2 && utils::has_sse41())
 			this->emit(x86::Inst::kIdPextrw, dst, v, Imm(0));
 		else if (vsize == 2)
-			this->push(x86::rax), this->pextrw(x86::eax, x86::xmm(v.id()), 0), this->mov(dst, x86::ax), this->pop(x86::rax);
+			this->push(x86::rax), this->pextrw(x86::eax, static_cast<const x86::Vec&>(v), 0), this->mov(dst, x86::ax), this->pop(x86::rax);
 		else if ((vmask && vmask < 8) || vsize >= 64)
 			this->emit(x86::Inst::kIdVmovdqu16, dst, v);
 		else
@@ -696,7 +706,7 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 4);
 		if (vsize == 4 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovd, dst, x86::xmm(v.id()));
+			this->emit(x86::Inst::kIdVmovd, dst, static_cast<const x86::Vec&>(v));
 		else if (vsize == 4)
 			this->emit(x86::Inst::kIdMovd, dst, v);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -708,7 +718,7 @@ void asmjit::simd_builder::vec_store_unaligned(u32 esize, const Operand& v, cons
 	{
 		ensure(vsize >= 8);
 		if (vsize == 8 && utils::has_avx())
-			this->emit(x86::Inst::kIdVmovq, dst, x86::xmm(v.id()));
+			this->emit(x86::Inst::kIdVmovq, dst, static_cast<const x86::Vec&>(v));
 		else if (vsize == 8)
 			this->emit(x86::Inst::kIdMovq, dst, v);
 		else if ((vmask && vmask < 8) || vsize >= 64)
@@ -827,20 +837,20 @@ void asmjit::simd_builder::vec_cmp_eq(u32 esize, const Operand& dst, const Opera
 	}
 }
 
-void asmjit::simd_builder::vec_extract_high(u32, const Operand& dst, const Operand& src)
+void asmjit::simd_builder::vec_extract_high(u32 vsize, const Operand& dst, const Operand& src)
 {
 	if (vsize == 32)
 		this->vextracti32x8(x86::ymm(dst.id()), x86::zmm(src.id()), 1);
 	else if (vsize == 16)
-		this->vextracti128(x86::xmm(dst.id()), x86::ymm(src.id()), 1);
+		this->vextracti128(static_cast<const x86::Vec&>(dst), x86::ymm(src.id()), 1);
 	else
 	{
 		if (utils::has_avx())
-			this->vpsrldq(x86::xmm(dst.id()), x86::xmm(src.id()), vsize);
+			this->vpsrldq(static_cast<const x86::Vec&>(dst), static_cast<const x86::Vec&>(src), vsize);
 		else
 		{
-			this->movdqa(x86::xmm(dst.id()), x86::xmm(src.id()));
-			this->psrldq(x86::xmm(dst.id()), vsize);
+			this->movdqa(static_cast<const x86::Vec&>(dst), static_cast<const x86::Vec&>(src));
+			this->psrldq(static_cast<const x86::Vec&>(dst), vsize);
 		}
 	}
 }
@@ -848,17 +858,17 @@ void asmjit::simd_builder::vec_extract_high(u32, const Operand& dst, const Opera
 void asmjit::simd_builder::vec_extract_gpr(u32 esize, const x86::Gp& dst, const Operand& src)
 {
 	if (esize == 8 && utils::has_avx())
-		this->vmovq(dst.r64(), x86::xmm(src.id()));
+		this->vmovq(dst.r64(), static_cast<const x86::Vec&>(src));
 	else if (esize == 8)
-		this->movq(dst.r64(), x86::xmm(src.id()));
+		this->movq(dst.r64(), static_cast<const x86::Vec&>(src));
 	else if (esize == 4 && utils::has_avx())
-		this->vmovd(dst.r32(), x86::xmm(src.id()));
+		this->vmovd(dst.r32(), static_cast<const x86::Vec&>(src));
 	else if (esize == 4)
-		this->movd(dst.r32(), x86::xmm(src.id()));
+		this->movd(dst.r32(), static_cast<const x86::Vec&>(src));
 	else if (esize == 2 && utils::has_avx())
-		this->vpextrw(dst.r32(), x86::xmm(src.id()), 0);
+		this->vpextrw(dst.r32(), static_cast<const x86::Vec&>(src), 0);
 	else if (esize == 2)
-		this->pextrw(dst.r32(), x86::xmm(src.id()), 0);
+		this->pextrw(dst.r32(), static_cast<const x86::Vec&>(src), 0);
 	else
 		fmt::throw_exception("Unimplemented");
 }

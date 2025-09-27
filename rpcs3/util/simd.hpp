@@ -363,11 +363,11 @@ namespace asmjit
 		{
 			if (op)
 			{
-				ensure(!g_vc->emit(op, a, std::forward<Args>(args)...));
+				ensure(g_vc->emit(op, a, std::forward<Args>(args)...) == asmjit::Error::kOk);
 			}
 			else
 			{
-				ensure(!g_vc->emit(op2, a, a, std::forward<Args>(args)...));
+				ensure(g_vc->emit(op2, a, a, std::forward<Args>(args)...) == asmjit::Error::kOk);
 			}
 
 			return a;
@@ -381,18 +381,18 @@ namespace asmjit
 				if (op2 && utils::has_avx())
 				{
 					// Assume op2 is AVX (but could be PSHUFD as well for example)
-					ensure(!g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...));
+					ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...) == asmjit::Error::kOk);
 				}
 				else
 				{
 					// TODO
-					ensure(!g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16)));
-					ensure(!g_vc->emit(op, r, std::forward<Args>(args)...));
+					ensure(g_vc->emit(x86::Inst::Id::kIdMovaps, r, arg_eval(std::forward<A>(a), 16)) == asmjit::Error::kOk);
+					ensure(g_vc->emit(op, r, std::forward<Args>(args)...) == asmjit::Error::kOk);
 				}
 			}
 			else
 			{
-				ensure(!g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...));
+				ensure(g_vc->emit(op2, r, arg_eval(std::forward<A>(a), 16), std::forward<Args>(args)...) == asmjit::Error::kOk);
 			}
 
 			return r;
@@ -411,12 +411,12 @@ namespace asmjit
 		{
 			if (!dst.has_base_label() && dst.has_offset() && dst.offset() % dst.size() == 0 && u64(dst.offset() + 128) >= 256 && u64(dst.offset() / dst.size() + 128) < 256)
 			{
-				ensure(!g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)));
+				ensure(g_vc->evex().emit(evex_op, dst, arg_eval(std::forward<S>(s), 16)) == asmjit::Error::kOk);
 				return;
 			}
 		}
 
-		ensure(!g_vc->emit(op, dst, arg_eval(std::forward<S>(s), 16)));
+		ensure(g_vc->emit(op, dst, arg_eval(std::forward<S>(s), 16)) == asmjit::Error::kOk);
 	}
 
 	template <typename A, typename B, typename... Args>
@@ -532,21 +532,21 @@ namespace asmjit
 			}
 
 			// Fallback to arg copy
-			ensure(!g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16)));
+			ensure(g_vc->emit(mov_op, src1, arg_eval(std::forward<A>(a), 16)) == asmjit::Error::kOk);
 		}
 		while (0);
 
 		if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 		{
-			ensure(!g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...));
+			ensure(g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...) == asmjit::Error::kOk);
 		}
 		else if (sse_op)
 		{
-			ensure(!g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
+			ensure(g_vc->emit(sse_op, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...) == asmjit::Error::kOk);
 		}
 		else
 		{
-			ensure(!g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
+			ensure(g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...) == asmjit::Error::kOk);
 		}
 
 		return vec_type(x86::Vec::make_v128(src1.id()));

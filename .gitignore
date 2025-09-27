@@ -124,3 +124,8 @@ CMakeUserPresets.json
 .cache/
 .lldbinit
 .qtcreator
+test_compile.cpp
+test_simd_compile.cpp
+test_asmjit_emit.cpp
+test_asmjit_error.cpp
+test_compatibility.cpp
