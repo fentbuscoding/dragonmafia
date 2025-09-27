@@ -324,7 +324,7 @@ namespace asmjit
 	{
 		if (op.is_reg())
 		{
-			g_vc->vec_dealloc(x86::xmm(op.id()));
+			g_vc->vec_dealloc(x86::Vec::make_v128(op.id()));
 		}
 	}
 
@@ -336,7 +336,7 @@ namespace asmjit
 			return g_vc->const_allocs.count(op) == 0;
 		else if constexpr (_class == arg_class::imm_lv)
 			return false;
-		else if (op.isMem())
+		else if (op.is_mem())
 		{
 			// Check if broadcast is set, or if the offset immediate can use disp8*N encoding
 			mem_type mem{};

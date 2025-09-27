@@ -1977,11 +1977,11 @@ auto VPERM()
 	{
 		static const ppu_intrp_func_t f = build_function_asm<ppu_intrp_func_t, asmjit::ppu_builder>("ppu_VPERM", [&](asmjit::ppu_builder& c, native_args&)
 		{
-			const auto [v0, v1, v2, v3] = static_cast<vec_builder&>(c).vec_alloc<4>();
+			const auto [v0, v1, v2, v3] = static_cast<asmjit::vec_builder&>(c).vec_alloc<4>();
 			c.movdqa(v0, c.ppu_vr(s_op.vc));
-			c.pandn(v0, static_cast<vec_builder&>(c).get_const(v128::from8p(0x1f)));
+			c.pandn(v0, static_cast<asmjit::vec_builder&>(c).get_const(v128::from8p(0x1f)));
 			c.movdqa(v1, v0);
-			c.pcmpgtb(v1, static_cast<vec_builder&>(c).get_const(v128::from8p(0xf)));
+			c.pcmpgtb(v1, static_cast<asmjit::vec_builder&>(c).get_const(v128::from8p(0xf)));
 			c.movdqa(v2, c.ppu_vr(s_op.va));
 			c.movdqa(v3, c.ppu_vr(s_op.vb));
 			c.pshufb(v2, v0);
