@@ -92,7 +92,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	using namespace asmjit;
 
 	StringLogger logger;
-	logger.addFlags(FormatFlags::kMachineCode);
+	logger.add_flags(FormatFlags::kMachineCode);
 
 	std::string log;
 
@@ -100,7 +100,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	code.init(m_asmrt.environment());
 
 	x86::Assembler compiler(&code);
-	compiler.addEncodingOptions(EncodingOptions::kOptimizedAlign);
+	compiler.add_encoding_options(EncodingOptions::kOptimizedAlign);
 	this->c = &compiler;
 
 	if (g_cfg.core.spu_debug && !add_loc->logged.exchange(1))
@@ -110,7 +110,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 		fs::write_file(m_spurt->get_cache_path() + "spu.log", fs::write + fs::append, log);
 
 		// Set logger
-		code.setLogger(&logger);
+		code.set_logger(&logger);
 	}
 
 	// Initialize args
@@ -325,10 +325,10 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 				consts.emplace_back([=, this]
 				{
 					c->bind(label);
-					c->dq(cmask);
+					c->embed_uint64(cmask);
 				});
 
-				c->setExtraReg(x86::k7);
+				c->set_extra_reg(x86::k7);
 				c->z().vmovdqa32(x86::zmm0, x86::zmmword_ptr(*qw1, j - ls_off));
 			}
 			else
@@ -864,11 +864,11 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 
 			if (found != instr_labels.end())
 			{
-				c->embedLabel(found->second);
+				c->embed_label(found->second);
 			}
 			else
 			{
-				c->embedLabel(label_stop);
+				c->embed_label(label_stop);
 			}
 		}
 	}
@@ -876,7 +876,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	c->align(AlignMode::kData, words_align);
 	c->bind(label_code);
 	for (u32 d : words)
-		c->dd(d);
+		c->embed_uint32(d);
 
 	for (auto&& work : ::as_rvalue(std::move(consts)))
 	{
@@ -889,7 +889,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	xmm_consts.clear();
 
 	// Compile and get function address
-	spu_function_t fn = reinterpret_cast<spu_function_t>(m_asmrt._add(&code));
+	spu_function_t fn = reinterpret_cast<spu_function_t>(m_asmrt.add(&code));
 
 	if (!fn)
 	{
@@ -897,7 +897,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	}
 	else
 	{
-		jit_announce(fn, code.codeSize(), fmt::format("spu-b-%s", fmt::base57(be_t<u64>(m_hash_start))));
+		jit_announce(fn, code.code_size(), fmt::format("spu-b-%s", fmt::base57(be_t<u64>(m_hash_start))));
 	}
 
 	// Install compiled function pointer
@@ -918,7 +918,7 @@ spu_function_t spu_recompiler::compile(spu_program&& _func)
 	{
 		// Add ASMJIT logs
 		fmt::append(log, "Address: %p\n\n", fn);
-		log.append(logger._content.data(), logger._content.size());
+		log.append(logger.content().data(), logger.content().size());
 		log += "\n\n\n";
 
 		// Append log file
@@ -966,8 +966,8 @@ inline asmjit::x86::Mem spu_recompiler::XmmConst(const v128& data)
 		{
 			c->align(asmjit::AlignMode::kData, 16);
 			c->bind(xmm_label);
-			c->dq(data._u64[0]);
-			c->dq(data._u64[1]);
+			c->embed_uint64(data._u64[0]);
+			c->embed_uint64(data._u64[1]);
 		});
 	}
 
@@ -1000,7 +1000,7 @@ void spu_recompiler::branch_fixed(u32 target, bool absolute)
 
 		if (absolute)
 		{
-			fail = c->newLabel();
+			fail = c->new_label();
 			c->cmp(pc0->r32(), m_base);
 			c->jne(fail);
 		}
@@ -1072,9 +1072,9 @@ void spu_recompiler::branch_indirect(spu_opcode_t op, bool jt, bool ret)
 			spu_runtime::g_escape(_spu);
 		};
 
-		Label no_intr = c->newLabel();
-		Label intr = c->newLabel();
-		Label fail = c->newLabel();
+		Label no_intr = c->new_label();
+		Label intr = c->new_label();
+		Label fail = c->new_label();
 
 		c->mov(*qw1, SPU_OFF_64(ch_events));
 		c->ror(*qw1, 32);
@@ -1115,7 +1115,7 @@ void spu_recompiler::branch_indirect(spu_opcode_t op, bool jt, bool ret)
 	if (g_cfg.core.spu_block_size != spu_block_size_type::safe && ret)
 	{
 		// Get stack pointer, try to use native return address (check SPU return address)
-		Label fail = c->newLabel();
+		Label fail = c->new_label();
 		c->mov(qw1->r32(), SPU_OFF_32(gpr, 1, &v128::_u32, 3));
 		c->and_(qw1->r32(), 0x3fff0);
 		c->lea(*qw1, x86::qword_ptr(*cpu, *qw1, 0, ::offset32(&spu_thread::stack_mirror)));
@@ -1131,7 +1131,7 @@ void spu_recompiler::branch_indirect(spu_opcode_t op, bool jt, bool ret)
 		if (!instr_table.is_valid())
 		{
 			// Request instruction table
-			instr_table = c->newLabel();
+			instr_table = c->new_label();
 		}
 
 		// Get actual instruction table bounds
@@ -1140,7 +1140,7 @@ void spu_recompiler::branch_indirect(spu_opcode_t op, bool jt, bool ret)
 
 		// Load local indirect jump address, check local bounds
 		ensure(start == m_base);
-		Label fail = c->newLabel();
+		Label fail = c->new_label();
 		c->mov(qw1->r32(), *addr);
 		c->sub(qw1->r32(), pc0->r32());
 		c->cmp(qw1->r32(), end - start);
@@ -1175,7 +1175,7 @@ void spu_recompiler::branch_set_link(u32 target)
 
 	if (local != instr_labels.end() && local->second.is_valid())
 	{
-		Label ret = c->newLabel();			// Get stack pointer, write native and SPU return addresses into the stack mirror
+		Label ret = c->new_label();			// Get stack pointer, write native and SPU return addresses into the stack mirror
 			c->mov(qw1->r32(), SPU_OFF_32(gpr, 1, &v128::_u32, 3));
 			c->and_(qw1->r32(), 0x3fff0);
 			c->lea(*qw1, x86::qword_ptr(*cpu, *qw1, 0, ::offset32(&spu_thread::stack_mirror)));
@@ -1267,7 +1267,7 @@ void spu_recompiler::STOP(spu_opcode_t op)
 {
 	using namespace asmjit;
 
-	Label ret = c->newLabel();
+	Label ret = c->new_label();
 	c->lea(addr->r64(), get_pc(m_pos));
 	c->and_(*addr, 0x3fffc);
 	c->mov(SPU_OFF_32(pc), *addr);
@@ -1343,9 +1343,9 @@ void spu_recompiler::RDCH(spu_opcode_t op)
 
 	auto read_channel = [&](x86::Mem channel_ptr, bool sync = true)
 	{
-		Label wait = c->newLabel();
-		Label again = c->newLabel();
-		Label ret = c->newLabel();
+		Label wait = c->new_label();
+		Label again = c->new_label();
+		Label ret = c->new_label();
 		c->mov(addr->r64(), channel_ptr);
 		c->xor_(qw0->r32(), qw0->r32());
 		c->align(AlignMode::kCode, 16);
@@ -2293,9 +2293,9 @@ void spu_recompiler::WRCH(spu_opcode_t op)
 	}
 	case SPU_WrOutMbox:
 	{
-		Label wait = c->newLabel();
-		Label again = c->newLabel();
-		Label ret = c->newLabel();
+		Label wait = c->new_label();
+		Label again = c->new_label();
+		Label ret = c->new_label();
 		c->mov(qw0->r32(), SPU_OFF_32(gpr, op.rt, &v128::_u32, 3));
 		c->mov(addr->r64(), SPU_OFF_64(ch_out_mbox));
 		c->align(AlignMode::kCode, 16);
@@ -2324,8 +2324,8 @@ void spu_recompiler::WRCH(spu_opcode_t op)
 	}
 	case MFC_WrTagMask:
 	{
-		Label upd = c->newLabel();
-		Label ret = c->newLabel();
+		Label upd = c->new_label();
+		Label ret = c->new_label();
 		c->mov(qw0->r32(), SPU_OFF_32(gpr, op.rt, &v128::_u32, 3));
 		c->mov(SPU_OFF_32(ch_tag_mask), qw0->r32());
 		c->cmp(SPU_OFF_32(ch_tag_upd), MFC_TAG_UPDATE_IMMEDIATE);
@@ -2348,9 +2348,9 @@ void spu_recompiler::WRCH(spu_opcode_t op)
 	}
 	case MFC_WrTagUpdate:
 	{
-		Label fail = c->newLabel();
-		Label zero = c->newLabel();
-		Label ret = c->newLabel();
+		Label fail = c->new_label();
+		Label zero = c->new_label();
+		Label ret = c->new_label();
 		c->mov(qw0->r32(), SPU_OFF_32(gpr, op.rt, &v128::_u32, 3));
 		c->cmp(qw0->r32(), 2);
 		c->ja(fail);
@@ -2448,7 +2448,7 @@ void spu_recompiler::WRCH(spu_opcode_t op)
 			_spu->do_mfc(true);
 		};
 
-		Label ret = c->newLabel();
+		Label ret = c->new_label();
 		c->mov(arg1->r32(), SPU_OFF_32(gpr, op.rt, &v128::_u32, 3));
 		c->and_(arg1->r32(), 0x1f);
 		c->btr(SPU_OFF_32(ch_stall_mask), arg1->r32());
@@ -4730,14 +4730,14 @@ void spu_recompiler::SHUFB(spu_opcode_t op)
 		const XmmLink& vm = XmmAlloc();
 		c->vpcmpub(asmjit::x86::k1, vc, XmmConst(v128::from8p(-0x40)), 5 /* GE */);
 		c->vpxor(vm, vc, XmmConst(v128::from8p(0xf)));
-		c->setExtraReg(asmjit::x86::k1);
+		c->set_extra_reg(asmjit::x86::k1);
 		c->z().vpblendmb(vc, vc, XmmConst(v128::from8p(-1))); // {k1}
 		c->vpcmpub(asmjit::x86::k2, vm, XmmConst(v128::from8p(-0x20)), 5 /* GE */);
 		c->vptestmb(asmjit::x86::k1, vm, XmmConst(v128::from8p(0x10)));
 		c->vpshufb(vt, va, vm);
-		c->setExtraReg(asmjit::x86::k2);
+		c->set_extra_reg(asmjit::x86::k2);
 		c->z().vpblendmb(va, va, XmmConst(v128::from8p(0x7f))); // {k2}
-		c->setExtraReg(asmjit::x86::k1);
+		c->set_extra_reg(asmjit::x86::k1);
 		c->vpshufb(vt, vb, vm); // {k1}
 		c->vpternlogd(vt, va, vc, 0xf6 /* orAxorBC */);
 		c->movdqa(SPU_OFF_128(gpr, op.rt4), vt);
