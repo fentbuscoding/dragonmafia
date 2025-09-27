@@ -433,7 +433,7 @@ namespace asmjit
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
 				g_vc->evex().emit(evex_op, src1, src1, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
-				return x86::xmm(src1.id());
+				return vec_type(x86::Vec::make_v128(src1.id()));
 			}
 
 			if constexpr (arg_classify<B> == arg_class::reg_rv)
@@ -471,11 +471,11 @@ namespace asmjit
 			if (utils::has_avx512() && evex_op && arg_use_evex<B>(b))
 			{
 				g_vc->evex().emit(evex_op, src1, srca, arg_eval(std::forward<B>(b), esize), std::forward<Args>(args)...);
-				return x86::xmm(src1.id());
+				return vec_type(x86::Vec::make_v128(src1.id()));
 			}
 
 			g_vc->emit(avx_op, src1, srca, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...);
-			return x86::xmm(src1.id());
+			return vec_type(x86::Vec::make_v128(src1.id()));
 		}
 		else do
 		{
@@ -549,7 +549,7 @@ namespace asmjit
 			ensure(!g_vc->emit(avx_op, src1, src1, arg_eval(std::forward<B>(b), 16), std::forward<Args>(args)...));
 		}
 
-		return x86::xmm(src1.id());
+		return vec_type(x86::Vec::make_v128(src1.id()));
 	}
 #define FOR_X64(f, ...) do { using enum asmjit::x86::Inst::Id; return asmjit::f(__VA_ARGS__); } while (0)
 #elif defined(ARCH_ARM64)
