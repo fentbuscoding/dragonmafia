@@ -62,6 +62,9 @@ namespace asmjit
 		vec_type(u32)
 		{
 		}
+		vec_type(const x86::Vec& vec) : Operand(vec)
+		{
+		}
 	};
 
 	struct mem_type : Operand
@@ -134,7 +137,7 @@ namespace asmjit
 
 			const u32 idx = std::countr_one(vec_allocated);
 			vec_allocated |= vec_allocated + 1;
-			return x86::xmm(idx);
+			return vec_type(x86::Vec::make_v128(idx));
 		}
 
 		template <u32 Size>
