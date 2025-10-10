@@ -47,30 +47,19 @@ FAudioBackend::FAudioBackend()
 
 FAudioBackend::~FAudioBackend()
 {
-	try
-	{
-		Close();
+	Close();
 
-		if (m_instance)
-		{
-			// Unregister callbacks before stopping engine
-			FAudio_UnregisterForCallbacks(m_instance, this);
-			
-			FAudio_StopEngine(m_instance);
-			FAudio_Release(m_instance);
-			m_instance = nullptr;
-		}
+	if (m_instance)
+	{
+		// Unregister callbacks before stopping engine
+		FAudio_UnregisterForCallbacks(m_instance, this);
 		
-		FAudio_.notice("FAudio backend destroyed successfully");
+		FAudio_StopEngine(m_instance);
+		FAudio_Release(m_instance);
+		m_instance = nullptr;
 	}
-	catch (const std::exception& e)
-	{
-		FAudio_.error("Exception during FAudio backend destruction: %s", e.what());
-	}
-	catch (...)
-	{
-		FAudio_.error("Unknown exception during FAudio backend destruction");
-	}
+	
+	FAudio_.notice("FAudio backend destroyed successfully");
 }
 
 void FAudioBackend::Play()
@@ -219,16 +208,7 @@ bool FAudioBackend::Open(std::string_view dev_id, AudioFreq freq, AudioSampleSiz
 	m_sample_size = sample_size;
 
 	// Setup channel layout with validation
-	try
-	{
-		setup_channel_layout(static_cast<u32>(ch_cnt), vd.InputChannels, layout, FAudio_);
-	}
-	catch (const std::exception& e)
-	{
-		FAudio_.error("Failed to setup channel layout: %s", e.what());
-		CloseUnlocked();
-		return false;
-	}
+	setup_channel_layout(static_cast<u32>(ch_cnt), vd.InputChannels, layout, FAudio_);
 
 	// Configure wave format
 	FAudioWaveFormatEx waveformatex{};
@@ -350,7 +330,7 @@ void FAudioBackend::OnVoiceProcessingPassStart_func(FAudioVoiceCallback *cb_obj,
 	if (BytesRequired > faudio->m_data_buf.size())
 	{
 		// This should never happen with proper initialization, but let's be safe
-		ensure(false, "FAudio internal buffer is too small (%u requested, %zu available). Report to developers!", 
+		FAudio_.error("FAudio internal buffer is too small (%u requested, %zu available). Report to developers!", 
 			BytesRequired, faudio->m_data_buf.size());
 		return;
 	}
@@ -363,21 +343,11 @@ void FAudioBackend::OnVoiceProcessingPassStart_func(FAudioVoiceCallback *cb_obj,
 
 	// Get audio data from callback
 	u32 written = 0;
-	try
+	if (faudio->m_write_callback)
 	{
 		written = faudio->m_write_callback(BytesRequired, faudio->m_data_buf.data());
 		written = std::min(written, BytesRequired);
 		written -= written % sample_size; // Align to sample boundary
-	}
-	catch (const std::exception& e)
-	{
-		// Log error but don't crash the audio thread
-		// Note: We can't use FAudio_.error here as it might not be thread-safe
-		written = 0;
-	}
-	catch (...)
-	{
-		written = 0;
 	}
 
 	// Update last sample for padding if we got any data
@@ -442,17 +412,6 @@ void FAudioBackend::OnCriticalError_func(FAudioEngineCallback *cb_obj, u32 Error
 	// Set reset request flag and notify application if we haven't already
 	if (!faudio->m_reset_req.test_and_set() && faudio->m_state_callback)
 	{
-		try
-		{
-			faudio->m_state_callback(AudioStateEvent::UNSPECIFIED_ERROR);
-		}
-		catch (const std::exception& e)
-		{
-			FAudio_.error("Exception in state callback during critical error: %s", e.what());
-		}
-		catch (...)
-		{
-			FAudio_.error("Unknown exception in state callback during critical error");
-		}
+		faudio->m_state_callback(AudioStateEvent::UNSPECIFIED_ERROR);
 	}
 }
